@@ -44,11 +44,11 @@ int main(int argc, char **argv){
     }
     printf("Encrypted data (length = %ld)(sizeof = %ld):\n%s\n", encrypt_len, sizeof(encrypt_out), encrypt_out);
 
-    //base64 encode
+    //base64 encode, if you want do this with base64url, use b64url_encode
     b64_en = b64_encode(encrypt_out, encrypt_len);
     printf("Encrypted data after base64 (length = %ld) =\n%s\n", strlen(b64_en), b64_en);
 
-    //base64 decode
+    //base64 decode, if you want do this with base64url, use b64url_decode
     if(b64_decode(b64_en, &b64_de, &b64_de_len) <= 0){
         printf("Base64 decode failed\n");
         free(encrypt_out);
