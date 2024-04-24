@@ -15,88 +15,82 @@
 static const unsigned char msg[] = "This is the original msg";
 
 int main(int argc, char **argv){
-    unsigned char *pubkey;
-    size_t pubkey_len;
-    unsigned char *pub8;
-    size_t pub8_len;
-    unsigned char *privkey;
-    size_t privkey_len;
-    unsigned char *priv8;
-    size_t priv8_len;
-    unsigned char *encrypt_out;
-    size_t encrypt_len;
-    unsigned char *decrypt_out;
-    size_t decrypt_len;
-    unsigned char *b64_en;
-    unsigned char *b64_de;
-    size_t b64_de_len;
+    myopenssl_k *mpk;
+    myopenssl_k *mp8;
+    myopenssl_d *mp_dec;
+    myopenssl_d *mp_enc;
+    b64_t *url_enc;
+    b64_t *url_dec;
 
     printf("Origin msg (sizeof = %ld)(length = %ld):\n%s\n", sizeof(msg), strlen(msg), msg);
 
     //genkey
-    if(genkey_str(&pubkey, &pubkey_len, &privkey, &privkey_len) <= 0){
-        printf("genkey() failed\n");
+    if((mpk = myopenssl_genkey()) == NULL){
+        printf("myopenssl_genkey() failed\n");
         return -1;
     }
-    printf("Pubkey (length = %ld) =\n%s\n", pubkey_len, pubkey);
-    printf("Privkey (length = %ld) =\n%s\n", privkey_len, privkey);
+    printf("Pubkey (length = %ld) =\n%s\n", mpk->publen, mpk->pubkey);
+    printf("Privkey (length = %ld) =\n%s\n", mpk->privlen, mpk->privkey);
 
     //encrypt
-    if(do_encrypt_str(pubkey, msg, strlen(msg), &encrypt_out, &encrypt_len) <= 0){
+    if((mp_enc = myopenssl_encrypt(mpk->pubkey, msg, strlen(msg))) == NULL){
         printf("Encrypt failed\n");
-        free(pubkey);
-        free(privkey);
-        return -1;
+        goto clean1;
     }
-    printf("Encrypted data (length = %ld)(sizeof = %ld):\n%s\n", encrypt_len, sizeof(encrypt_out), encrypt_out);
+    printf("Encrypted data (length = %ld)(sizeof = %ld):\n%s\n", mp_enc->data_len, sizeof(mp_enc->data), mp_enc->data);
 
     //base64url encode, if you want do this with base64url, use b64_encode
-    b64_en = b64url_encode(encrypt_out, encrypt_len);
-    printf("Encrypted data after base64 (length = %ld) =\n%s\n", strlen(b64_en), b64_en);
+    if((url_enc = b64url_encode(mp_enc->data, mp_enc->data_len)) == NULL){
+        printf("B64URL encode failed\n");
+        goto clean2;
+    }
+    printf("Encrypted data after base64url (length = %ld) =\n%s\n", url_enc->data_len, url_enc->data);
 
     //base64url decode, if you want do this with base64url, use b64_decode
-    if(b64url_decode(b64_en, &b64_de, &b64_de_len) <= 0){
+    if((url_dec = b64url_decode(url_enc->data, url_enc->data_len)) == NULL){
         printf("Base64 decode failed\n");
-        free(pubkey);
-        free(privkey);
-        free(encrypt_out);
-        free(b64_en);
-        return -1;
+        goto clean3;
     }
-    printf("After base64 decode (length = %ld) =\n%s\n", b64_de_len, b64_de);
+    printf("After base64url decode (length = %ld) =\n%s\n", url_dec->data_len, url_dec->data);
 
     //decrypt
-    if(do_decrypt_str(privkey, encrypt_out, encrypt_len, &decrypt_out, &decrypt_len) <= 0){
+    if((mp_dec = myopenssl_decrypt(mpk->privkey, mp_enc->data, mp_enc->data_len)) == NULL){
         printf("Decrypt failed\n");
-        free(pubkey);
-        free(privkey);
-        free(encrypt_out);
-        free(b64_en);
-        free(b64_de);
-        return -1;
+        goto clean4;
     }
-    printf("Decrypted data:\n%s\n", decrypt_out);
+    printf("Decrypted data:\n%s\n", mp_dec->data);
 
-    if(strcmp(msg, decrypt_out) == 0) printf("Original msg = decrypted msg\n");
-    else printf("Original msg != decrypted msg\n");
+    if(strcmp(msg, mp_dec->data) == 0) printf("Original msg = decrypted msg\n");
+    else{
+        printf("Original msg != decrypted msg\n");
+        goto clean5;
+    }
 
     //make PKCS#8 format key
-    if(pkcs8_maker_str(pubkey, 1, &pub8, &pub8_len) <= 0) printf("PKCS8 failed\n");
-    else printf("PKCS#8 pubkey (length = %ld) =\n%s\n", pub8_len, pub8);
+    if((mp8 = myopenssl_pkcs8(mpk->pubkey, 1)) == NULL){
+        printf("PKCS8 failed\n");
+        goto clean5;
+    }else printf("PKCS#8 pubkey (length = %ld) =\n%s\n", mp8->publen, mp8->pubkey);
+    myopenssl_k_free(mp8);
 
-    if(pkcs8_maker_str(privkey, 0, &priv8, &priv8_len) <= 0) printf("PKCS8 failed\n");
-    else printf("PKCS#8 pubkey (length = %ld) =\n%s\n", priv8_len, priv8);
-
-    //remember free the PKCS#1 and PKCS#8 format pub/privkey & encrypt/decrypt output after used
-    free(pubkey);
-    free(privkey);
-    free(encrypt_out);
-    free(b64_en);
-    free(b64_de);
-    free(decrypt_out);
-    free(pub8);
-    free(priv8);
+    if((mp8 = myopenssl_pkcs8(mpk->privkey, 0)) == NULL){
+        printf("PKCS8 failed\n");
+        goto clean5;
+    }else printf("PKCS#8 privkey (length = %ld) =\n%s\n", mp8->privlen, mp8->privkey);
 
     printf("All finish\n");
+
+    //remember free the PKCS#1 and PKCS#8 format pub/privkey & encrypt/decrypt output after used
+    myopenssl_k_free(mp8);
+    clean5:
+    myopenssl_d_free(mp_dec);
+    clean4:
+    b64_free(url_dec);
+    clean3:
+    b64_free(url_enc);
+    clean2:
+    myopenssl_d_free(mp_enc);
+    clean1:
+    myopenssl_k_free(mpk);
     return 0;
 }

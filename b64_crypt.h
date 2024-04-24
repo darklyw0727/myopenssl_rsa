@@ -4,72 +4,45 @@
 #define _B64_CRYPT_H
 
 #ifdef _B64_DEBUG
-#define B64_DEBUG(fomat, args...) printf("[%s:%s:%d] "fomat, __FILE__, __FUNCTION__, __LINE__, ##args)
+#define B64_DEBUG(format, args...) printf("[%s:%s:%d] "format, __FILE__, __FUNCTION__, __LINE__, ##args)
 #else
 #define B64_DEBUG(args...)
 #endif
 
-/**
- * Repalce all char A in string to char B
- * @param in <in+out> input string, will be replaced step by step
- * @param ori_char <in> the char you want to replace, use ' ' not " "
- * @param rep_char <in> the char you need in output, use " "
-*/
-static void replace_char(char *in, int ori_char, char *rep_char);
+typedef struct b64{
+    unsigned char *data;
+    size_t data_len;
+} b64_t;
+
+void b64_free(b64_t *ptr);
 
 /**
- * Count the length after base64 encode
- * @param inlen <in> input length
- * @retval The length of input char in base64 fomat
-*/
-static size_t b64_encoded_size(size_t inlen);
-/**
- * Make binary char to base64 fomat
- * @param in <in> input binary char
+ * Make input string to base64 format
+ * @param in <in> input string
  * @param len <in> input length
- * @retval Input char in base64 fomat
+ * @returns NULL (error) or b64_t that include output string and length
 */
-char *b64_encode(const unsigned char *in, size_t len);
+b64_t *b64_encode(const unsigned char *in, size_t len);
 /**
- * Make binary char to base64url fomat
- * @param in <in> input binary char
+ * Make input string to base64url format
+ * @param in <in> input string
  * @param len <in> input length
- * @retval Input char in base64url fomat
+ * @returns NULL (error) or the b64_t include output string and length
 */
-char *b64url_encode(const unsigned char *in, size_t len);
+b64_t *b64url_encode(const unsigned char *in, size_t len);
 
 /**
- * Count the length after base64 decode
- * @param in <in> input length
- * @retval The length of input char in binary fomat
+ * Make base64 string to normal (origin) string
+ * @param in <in> input string in base64 format
+ * @param len <in> input length
+ * @returns NULL (error) or the b64_t include output string and length
 */
-static size_t b64_decoded_size(const char *in);
+b64_t *b64_decode(const char *in, size_t len);
 /**
- * Check the input char is in base64 table or not
- * @param c <in> input char
- * @returns 1 (in table) or 0
+ * Make base64url char string to normal (origin) string
+ * @param in <in> input string in base64 format
+ * @param len <in> input length
+ * @returns NULL (error) or the b64_t include output string and length
 */
-static int b64_checkchar(char c);
-/**
- * Make base64 input char to binary
- * @param in <in> input char in base64 fomat
- * @param out <out> output char in binary
- * @param outlen <out> output length
- * @returns 1 (successes) or 0
-*/
-int b64_decode(const char *in, unsigned char **out, size_t *outlen);
-/**
- * Check the input char is in base64url table or not
- * @param c <in> input char
- * @returns 1 (in table) or 0
-*/
-static int b64url_checkchar(char c);
-/**
- * Make base64url input char to binary
- * @param in <in> input char in base64 fomat
- * @param out <out> output char in binary
- * @param outlen <out> output length
- * @returns 1 (successes) or 0
-*/
-int b64url_decode(const char *in, unsigned char **out, size_t *outlen);
+b64_t *b64url_decode(const char *in, size_t len);
 #endif

@@ -11,53 +11,47 @@
 
 /**
  * Base on openssl 3.0
- * If inpit & output are file format, use the function without suffix.
- * If input & output are string format, use the function with "str" suffix.
+ * If your key is a file, use the function with f suffix.
 */
 
-/**
- * Make EVP_PKEY to PEM format file
- * @param pkey <in> EVP_PKEY
- * @param f <in> where to save key
- * @param selection <in> EVP_PKEY_PUBLIC_KEY or EVP_PKEY_KEYPAIR
- * @returns 1 (successes) or 0
-*/
-static int key_encode(EVP_PKEY *pkey, FILE *f, const int selection);
+typedef struct myopenssl_key {
+    unsigned char *pubkey;
+    size_t publen;
+    unsigned char *privkey;
+    size_t privlen;
+} myopenssl_k;
+
+typedef struct myopenssl_data {
+    unsigned char *data;
+    size_t data_len;
+} myopenssl_d;
+
+void myopenssl_k_free(myopenssl_k *ptr);
+void myopenssl_d_free(myopenssl_d *ptr);
+
 /**
  * Create RSA public & private key in PEM format file
  * @param pubkey_file <in> where to save public key
  * @param privkey_file <in> where to save private key
  * @returns 1 (successes) or 0
 */
-int genkey(const char *pubkey_file, const char *privkey_file);
-/**
- * Make PEM key file to EVP_PKEY
- * @param libctx <in> OSSL_LIB_CTX
- * @param keyfile <in> where is the key
- * @param public <in> public key or not, 1 or 0
- * @retval EVP_PKEY
-*/
-static EVP_PKEY *load_key(OSSL_LIB_CTX *libctx, const char *keyfile, const int selection);
+int myopenssl_genkey_f(const char *pubkey_file, const char *privkey_file);
 /**
  * Encrypt input
  * @param keyfile <in> where is the public key
  * @param in <in> input string
  * @param in_len <in> input length
- * @param out <out> output, binary
- * @param out_len <out> output length
- * @returns 1 (seccedsses) or 0
+ * @returns NULL (error) or myopenssl_d that include output string and length
 */
-int do_encrypt(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char **out, size_t *out_len);
+myopenssl_d *myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len);
 /**
- * Decrypt
+ * Decrypt input. Please decode input, if it is base64/base64url encoded
  * @param keyfile <in> where is the private key
- * @param in <in> input, binary
+ * @param in <in> input string
  * @param in_len <in> input length
- * @param out <out> output string
- * @param out_len <out> output length
- * @returns 1 (successes) or 0
+ * @returns NULL (error) or myopenssl_d that include output string and length
 */
-int do_decrypt(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char **out, size_t *out_len);
+myopenssl_d *myopenssl_decrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len);
 /**
  * Create a PKCS#8 PEM key form PKCS#1 PEM key
  * @param infile <in> where is the PKCS#1 PEM key file
@@ -65,62 +59,34 @@ int do_decrypt(const char *keyfile, const unsigned char *in, const size_t in_len
  * @param outfile <out> where to save the PKCS#8 PEM key
  * @returns 1 (successes) or 0
 */
-int pkcs8_maker(const char *infile, const int public, const char *outfile);
+int myopenssl_pkcs8_f(const char *infile, const int public, const char *outfile);
 
 /**
- * Make EVP_PKEY to PEM format string
- * @param pkey <in> EVP_PKEY
- * @param out <out> string, pubkey or privkey
- * @param out_len <out> output length
- * @param selection <in> EVP_PKEY_PUBLIC_KEY or EVP_PKEY_KEYPAIR
- * @returns 1 (successes) or 0
-*/
-static int key_encode_str(EVP_PKEY *pkey, unsigned char **out, size_t *out_len, const int selection);
-/**
  * Create RSA public & private key in PEM format string
- * @param pubout <out> pubkey string
- * @param pubout_len <out> pubkey length
- * @param privout <out> privkey string
- * @param privout_len <out> privkey length
- * @returns 1 (successes) or 0
+ * @returns NULL (error) or myopenssl_k that include PKCS#1 pubkey ,privkey string and their length
 */
-int genkey_str(unsigned char **pubout, size_t *pubout_len, unsigned char **privout, size_t *privout_len);
-/**
- * Make PEM format string to EVP_PKEY
- * @param libctx <in> OSSL_LIB_CTX
- * @param key <in> the pubkey or privkey you want to use
- * @param ken_len <in> key length
- * @param selection <in> EVP_PKEY_PUBLIC_KEY or EVP_PKEY_KEYPAIR
- * @retval EVP_PKEY
-*/
-static EVP_PKEY *load_key_str(OSSL_LIB_CTX *libctx, const unsigned char *key, const size_t key_len, const int selection);
+myopenssl_k *myopenssl_genkey();
 /**
  * Encrypt input
  * @param pubkey <in> pubkey string
  * @param in <in> input string
  * @param in_len <in> input length
- * @param out <out> output, binary
- * @param out_len <out> output length
- * @returns 1 (seccedsses) or 0
+ * @returns NULL (error) or myopenssl_d that include output string and length
 */
-int do_encrypt_str(const unsigned char *pubkey, const unsigned char *in, const size_t in_len, unsigned char **out, size_t *out_len);
+myopenssl_d *myopenssl_encrypt(const unsigned char *pubkey, const unsigned char *in, const size_t in_len);
 /**
- * Decrypt
+ * Decrypt input. Please decode input, if it is base64/base64url encoded
  * @param privkey <in> privkey string
- * @param in <in> input ,binary
+ * @param in <in> input string
  * @param in_len <in> input length
- * @param out <out> output string
- * @param out_len <out> output length
- * @returns 1 (successes) or 0
+ * @returns NULL (error) or myopenssl_d that include output string and length
 */
-int do_decrypt_str(const unsigned char *privkey, const unsigned char *in, const size_t in_len, unsigned char **out, size_t *out_len);
+myopenssl_d *myopenssl_decrypt(const unsigned char *privkey, const unsigned char *in, const size_t in_len);
 /**
  * Create a PKCS#8 PEM key string form PKCS#1 PEM key string
  * @param in <in> PKCS#1 PEM key string
  * @param public <in> pubkey or privkey, 1 or 0
- * @param out <out> PKCS#8 PEM key string
- * @param out_len <out> output length
- * @returns 1 (successes) or 0
+ * @returns NULL (error) or myopenssl_k that include PKCS#8 pubkey/privkey string and their length
 */
-int pkcs8_maker_str(const unsigned char *in, const int public, unsigned char **out, size_t *out_len);
+myopenssl_k *myopenssl_pkcs8(const unsigned char *in, const int public);
 #endif
