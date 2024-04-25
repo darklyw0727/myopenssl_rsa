@@ -10,7 +10,7 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include "myopenssl.h"
-#include "b64_crypt.h"
+#include "b64_codec.h"
 
 static const unsigned char msg[] = "This is the original msg";
 

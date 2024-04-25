@@ -10,7 +10,7 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include "myopenssl.h"
-#include "b64_crypt.h"
+#include "b64_codec.h"
 
 //suffix can be .pem / .crt / .cer / .key
 #define PUB_PATH "pubkey.key"

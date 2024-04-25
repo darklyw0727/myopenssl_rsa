@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "b64_crypt.h"
+#include "b64_codec.h"
 
 void b64_free(b64_t *ptr){
 	if(ptr->data) free(ptr->data);

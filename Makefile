@@ -1,6 +1,6 @@
 CC = gcc
 TARGET = demo str_demo
-SOURCE = myopenssl.c demo_include/b64_crypt.c
+SOURCE = myopenssl.c demo_include/b64_codec.c
 OBJECT = $(SOURCE:.c=.o)
 INCLUDE = -I/usr/include/openssl -I./demo_include
 LIBS = -lssl -lcrypto
