@@ -1,8 +1,8 @@
 CC = gcc
 TARGET = demo str_demo
-SOURCE = myopenssl.c b64_crypt.c
+SOURCE = myopenssl.c demo_include/b64_crypt.c
 OBJECT = $(SOURCE:.c=.o)
-INCLUDE = -I/usr/include/openssl
+INCLUDE = -I/usr/include/openssl -I./demo_include
 LIBS = -lssl -lcrypto
 
 ifdef OPENSSL_DEBUG
@@ -22,9 +22,9 @@ str_demo: str_demo.o $(OBJECT)
 	$(CC) -o $@ $^ $(INCLUDE) $(LIBS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@ $(INCLUDE)
 
 .PHONY : clean all
 
 clean : 
-	rm $(TARGET) *.o *.key
+	-rm $(TARGET) $(OBJECT) *.o *.key
