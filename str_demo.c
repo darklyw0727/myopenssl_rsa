@@ -47,7 +47,7 @@ int main(int argc, char **argv){
     printf("Encrypted data after base64url (length = %ld) =\n%s\n", url_enc->data_len, url_enc->data);
 
     //base64url decode, if you want do this with base64url, use b64_decode
-    if((url_dec = b64url_decode(url_enc->data, url_enc->data_len)) == NULL){
+    if((url_dec = b64url_decode(url_enc->data)) == NULL){
         printf("Base64 decode failed\n");
         goto clean3;
     }
@@ -58,7 +58,7 @@ int main(int argc, char **argv){
         printf("Decrypt failed\n");
         goto clean4;
     }
-    printf("Decrypted data:\n%s\n", mp_dec->data);
+    printf("Decrypted data (length = %ld) : \n%s\n", mp_dec->data_len, mp_dec->data);
 
     if(strcmp(msg, mp_dec->data) == 0) printf("Original msg = decrypted msg\n");
     else{

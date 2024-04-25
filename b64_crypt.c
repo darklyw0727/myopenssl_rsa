@@ -27,7 +27,7 @@ static void replace_char(char *in, int ori_char, char *rep_char){
 		B64_DEBUG("buf = %s\n", buf);
 
 		strcpy(in, buf);//Replace input by buffer
-		B64_DEBUG("buf = %s\n", buf);
+		//B64_DEBUG("buf = %s\n", buf);
 		B64_DEBUG("String after repalce is : %s\n", in);
 	}
 
@@ -100,7 +100,7 @@ b64_t *b64_encode(const unsigned char *in, size_t len)
 		}
 	}
 	ret->data[elen] = '\0';
-	ret->data_len = elen;
+	ret->data_len = strlen(ret->data);
 	B64_DEBUG("B64 encode data (length = %ld):\n%s\n", ret->data_len, ret->data);
 	B64_DEBUG("---B64 encode finish---\n");
 
@@ -128,12 +128,13 @@ b64_t *b64url_encode(const unsigned char *in, size_t len)
 			return NULL;
 		}
 		memset(buf, 0, ptr-(ret->data)+1);
+
 		strncpy(buf, ret->data, ptr-(ret->data));
 		buf[ptr-(ret->data)] = '\0';
 		
-		ret->data_len = ptr-(ret->data);
 		free(ret->data);
 		ret->data = buf;
+		ret->data_len = strlen(ret->data);
 	}
 	B64_DEBUG("b64url encode step2: %s\n", ret->data);
 
@@ -201,16 +202,18 @@ static int b64url_checkchar(char c)
 		return 1;
 	if (c == '-' || c == '_')
 		return 1;
+	B64_DEBUG("Read %s -> failed\n", c);
 	return 0;
 }
 
-b64_t *b64_decode(const char *in, size_t len)
+b64_t *b64_decode(const char *in)
 {
     B64_DEBUG("---B64 decode---\n");
 	b64_t *ret;
 	size_t i;
 	size_t j;
 	int    v;
+	size_t len = strlen(in);
 
 	//Check input length
 	if(in == NULL) return NULL;
@@ -259,22 +262,27 @@ b64_t *b64_decode(const char *in, size_t len)
 	return ret;
 }
 
-b64_t *b64url_decode(const char *in, size_t len)
+b64_t *b64url_decode(const char *in)
 {
 	b64_t *ret;
+	size_t len;
 	char *buf;
 	size_t buf_len;
 
+	len = strlen(in);
+
 	//Check input is base64url fomat
 	for(int a = 0; a < len; a++){
-		if(b64url_checkchar(in[a]) <= 0) return NULL;
+		if(b64url_checkchar(in[a]) <= 0){
+			B64_DEBUG("b64url_checkchar() failed\n");
+			return NULL;
+		}
 	}
 
 	//Copy input
 	buf = malloc(len+1);
 	memset(buf, 0, len+1);
-	strncpy(buf, in, len);
-	buf[len] = '\0';
+	strcpy(buf, in);
 
 	//Turn to base64 fomat
 	replace_char(buf, '_', "/");
@@ -285,7 +293,7 @@ b64_t *b64url_decode(const char *in, size_t len)
 	else if((buf_len %4) == 3) strcat(buf, "=");
 
 	//Base64 decode
-	ret = b64_decode(buf, strlen(buf));
+	ret = b64_decode(buf);
 	
 	free(buf);
 	return ret;

@@ -217,15 +217,15 @@ myopenssl_d *myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, c
         myopenssl_d_free(mp);
         goto clean;
     }
+    mp->data_len = data_len;
 
     //Encrypt
-    if(EVP_PKEY_encrypt(ctx, mp->data, &data_len, in, in_len) <= 0){
+    if(EVP_PKEY_encrypt(ctx, mp->data, &mp->data_len, in, in_len) <= 0){
         OPENSSL_DEBUG("Encrypt data step2 failed\n");
         myopenssl_d_free(mp);
         goto clean;
     }
     OPENSSL_DEBUG("Encrypt data:\n%s\n", mp->data);
-    mp->data_len = data_len;
     ret = mp;
 
     clean:
@@ -280,15 +280,15 @@ myopenssl_d *myopenssl_decrypt_f(const char *keyfile, const unsigned char *in, c
         myopenssl_d_free(mp);
         goto clean;
     }
+    mp->data_len = decrypt_len;
 
-    int decrypt_ret = EVP_PKEY_decrypt(ctx, mp->data, &decrypt_len, in, in_len);
+    int decrypt_ret = EVP_PKEY_decrypt(ctx, mp->data, &mp->data_len, in, in_len);
     if(decrypt_ret <= 0){
         OPENSSL_DEBUG("Decrypt data step2 failed\n");
         myopenssl_d_free(mp);
         goto clean;
     }
     OPENSSL_DEBUG("Decrypt data:\n%s\n", mp->data);
-    mp->data_len = decrypt_len;
     ret = mp;
 
     clean:
@@ -505,14 +505,14 @@ myopenssl_d *myopenssl_encrypt(const unsigned char *pubkey, const unsigned char 
         myopenssl_d_free(mp);
         goto clean;
     }
+    mp->data_len = data_len;
 
-    if(EVP_PKEY_encrypt(ctx, mp->data, &data_len, in, in_len) <= 0){
+    if(EVP_PKEY_encrypt(ctx, mp->data, &mp->data_len, in, in_len) <= 0){
         OPENSSL_DEBUG("Encrypt data step2 failed\n");
         myopenssl_d_free(mp);
         goto clean;
     }
     OPENSSL_DEBUG("Encrypt data:\n%s\n", mp->data);
-    mp->data_len = data_len;
     ret = mp;
 
     clean:
@@ -567,15 +567,15 @@ myopenssl_d *myopenssl_decrypt(const unsigned char *privkey, const unsigned char
         myopenssl_d_free(mp);
         goto clean;
     }
+    mp->data_len = decrypt_len;
 
-    int decrypt_ret = EVP_PKEY_decrypt(ctx, mp->data, &decrypt_len, in, in_len);
+    int decrypt_ret = EVP_PKEY_decrypt(ctx, mp->data, &mp->data_len, in, in_len);
     if(decrypt_ret <= 0){
         OPENSSL_DEBUG("Decrypt data step2 failed (%d)\n", decrypt_ret);
         myopenssl_d_free(mp);
         goto clean;
     }
     OPENSSL_DEBUG("Decrypt data:\n%s\n", mp->data);
-    mp->data_len = decrypt_len;
     ret = mp;
 
     clean:
@@ -631,13 +631,15 @@ myopenssl_k *myopenssl_pkcs8(const unsigned char *in, const int public){
         fclose(tmp);
         goto clean;
     }
+    memset(buf, 0 ,sizeof(buf));
     buf_len = fread(buf, sizeof(char), 2048, tmp);
-    OPENSSL_DEBUG("Buffer data from tmp (length = %ld) =\n%s\n", buf_len, buf);
+    fclose(tmp);
+
     if(buf_len <= 0){
         OPENSSL_DEBUG("Can't read pkcs8 file\n");
-        fclose(tmp);
         goto clean;
     }else{
+        OPENSSL_DEBUG("Buffer data from tmp (length = %ld) =\n%s\n", buf_len, buf);
         mp = malloc(sizeof(struct myopenssl_key));
         if(!mp){
             OPENSSL_DEBUG("Malloc failed\n");
@@ -652,10 +654,11 @@ myopenssl_k *myopenssl_pkcs8(const unsigned char *in, const int public){
                 myopenssl_k_free(mp);
                 goto clean;
             }
-            strncpy(mp->pubkey, buf, buf_len);
-            mp->pubkey[buf_len] = '\0';
+            memset(mp->pubkey, 0, buf_len+1);
             mp->publen = buf_len;
-            OPENSSL_DEBUG("Key from buffer (length = %ld) =\n%s\n", strlen(mp->pubkey), mp->pubkey);
+
+            strcpy(mp->pubkey, buf);
+            OPENSSL_DEBUG("Final output (length = %ld) =\n%s\n", mp->publen, mp->pubkey);
         }else{
             mp->privkey = malloc(buf_len+1);
             if(!mp->privkey){
@@ -663,14 +666,13 @@ myopenssl_k *myopenssl_pkcs8(const unsigned char *in, const int public){
                 myopenssl_k_free(mp);
                 goto clean;
             }
-            strncpy(mp->privkey, buf, buf_len);
-            mp->privkey[buf_len] = '\0';
+            memset(mp->privkey, 0, buf_len+1);
             mp->privlen = buf_len;
-            OPENSSL_DEBUG("Key from buffer (length = %ld) =\n%s\n", strlen(mp->privkey), mp->privkey);
+
+            strcpy(mp->privkey, buf);
+            OPENSSL_DEBUG("Final output (length = %ld) =\n%s\n", mp->privlen, mp->privkey);
         }
     }
-
-    fclose(tmp);
     ret = mp;
 
     clean:

@@ -49,7 +49,7 @@ int main(int argc, char **argv){
     printf("Encrypted data after base64 (length = %ld) =\n%s\n", b64_enc->data_len, b64_enc->data);
 
     //base64 decode, if you want do this with base64url, use b64url_decode
-    if((b64_dec = b64_decode(b64_enc->data, b64_enc->data_len)) == NULL){
+    if((b64_dec = b64_decode(b64_enc->data)) == NULL){
         printf("Base64 decode failed\n");
         goto clean2;
     }
