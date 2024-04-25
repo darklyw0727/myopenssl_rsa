@@ -11,13 +11,13 @@
     - include base64url encode / decode
 
 ### HOW TO USE
-- myopenssl_d for save encrypt/decrypt data
-- myopenssl_k for save RSA keypair
-- myopenssl_genkey() to create RSA keypair, it will return a myopenssl_k pointer
-    - myopenssl_genkey_f(const char *pubkey_file, const char *privkey_file) will return 1 or 0 for successes or error
-- myopenssl_encrypt/decrypt/encrypt_f/decrypt_f(const unsigned char *key/keyfile, const unsigned char *in, const size_t in_len) for encrypt/decrypt data, it will return a myopenssl_d pointer
-- myopenssl_pkcs8(const unsigned char *in, const int public) for create a PKCS#8 format pubkey/privkey from PKCS#1 key, it will return a myopenssl_k pointer
-    - myopenssl_genkey_f(const char *infile, const int public, const char *outfile) will return 1 or 0 for successes or error
+- `myopenssl_d` for save encrypt/decrypt data
+- `myopenssl_k` for save RSA keypair
+- `myopenssl_genkey()` to create RSA keypair, it will return a myopenssl_k pointer
+    - `myopenssl_genkey_f(const char *pubkey_file, const char *privkey_file)` will return 1 or 0 for successes or error
+- `myopenssl_encrypt/decrypt/encrypt_f/decrypt_f(const unsigned char *key/keyfile, const unsigned char *in, const size_t in_len)` for encrypt/decrypt data, it will return a myopenssl_d pointer
+- `myopenssl_pkcs8(const unsigned char *in, const int public)` for create a PKCS#8 format pubkey/privkey from PKCS#1 key, it will return a myopenssl_k pointer
+    - `myopenssl_genkey_f(const char *infile, const int public, const char *outfile)` will return 1 or 0 for successes or error
 ```c
 //you RSA keys are string format
 myopenssl_k *mpk = genkey();
