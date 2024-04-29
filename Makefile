@@ -16,10 +16,10 @@ endif
 all: $(TARGET)
 
 demo: demo.o $(OBJECT)
-	$(CC) -o $@ $^ $(INCLUDE) $(LIBS)
+	$(CC) -g -o $@ $^ $(INCLUDE) $(LIBS)
 
 str_demo: str_demo.o $(OBJECT)
-	$(CC) -o $@ $^ $(INCLUDE) $(LIBS)
+	$(CC) -g -o $@ $^ $(INCLUDE) $(LIBS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@ $(INCLUDE)

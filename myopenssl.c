@@ -25,13 +25,6 @@ void myopenssl_k_free(myopenssl_k *ptr){
     OPENSSL_DEBUG("free 3/3\n");
 }
 
-void myopenssl_d_free(myopenssl_d *ptr){
-    if(ptr->data) free(ptr->data);
-    OPENSSL_DEBUG("free 1/2\n");
-    free(ptr);
-    OPENSSL_DEBUG("free 2/2\n");
-}
-
 static int key_encode_f(EVP_PKEY *pkey, FILE *f, const int selection){
     OPENSSL_DEBUG("---Key encode---\n");
     int ret = 0;
@@ -172,13 +165,14 @@ static EVP_PKEY *load_key_f(OSSL_LIB_CTX *libctx, const char *keyfile, const int
     return key;
 }
 
-myopenssl_d *myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len){
+size_t myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char *out){
     OPENSSL_DEBUG("---Encrypt---\n");
-    myopenssl_d *ret = NULL;
+    size_t ret = 0;
     OSSL_LIB_CTX *libctx = NULL;
     EVP_PKEY *pkey = NULL;
     EVP_PKEY_CTX *ctx = NULL;
-    size_t data_len = 0;
+    unsigned char *buf;
+    size_t buf_len;
 
     //Load key
     pkey = load_key_f(libctx, keyfile, EVP_PKEY_PUBLIC_KEY);
@@ -199,34 +193,25 @@ myopenssl_d *myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, c
     }
 
     //Get encrypted data length
-    if(EVP_PKEY_encrypt(ctx, NULL, &data_len, in, in_len) <= 0){
-        OPENSSL_DEBUG("Encrypt data step1 failed\n");
-        goto clean;
-    }
-
-    myopenssl_d *mp = malloc(sizeof(struct myopenssl_data));
-    if(!mp){
+    size_t buf_size = 256*(1+(in_len/245));
+    buf = malloc(buf_size);
+    if(buf == NULL){
         OPENSSL_DEBUG("Malloc failed\n");
         goto clean;
     }
-    memset(mp, 0, sizeof(myopenssl_d));
-
-    mp->data = OPENSSL_zalloc(data_len);
-    if(mp->data == NULL){
-        OPENSSL_DEBUG("OPENSSL_zalloc failed\n");
-        myopenssl_d_free(mp);
-        goto clean;
-    }
-    mp->data_len = data_len;
+    memset(buf, 0, buf_size);
 
     //Encrypt
-    if(EVP_PKEY_encrypt(ctx, mp->data, &mp->data_len, in, in_len) <= 0){
+    if(EVP_PKEY_encrypt(ctx, buf, &buf_len, in, in_len) <= 0){
         OPENSSL_DEBUG("Encrypt data step2 failed\n");
-        myopenssl_d_free(mp);
+        free(buf);
         goto clean;
     }
-    OPENSSL_DEBUG("Encrypt data:\n%s\n", mp->data);
-    ret = mp;
+    OPENSSL_DEBUG("Encrypt data buffer:\n%s\n", buf);
+
+    memcpy(out, buf, buf_len);
+    free(buf);
+    ret = buf_len;
 
     clean:
     OSSL_LIB_CTX_free(libctx);
@@ -236,13 +221,14 @@ myopenssl_d *myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, c
     return ret;
 }
 
-myopenssl_d *myopenssl_decrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len){
+size_t myopenssl_decrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char *out){
     OPENSSL_DEBUG("---Decrypt---\n");
-    myopenssl_d *ret = NULL;
+    size_t ret = 0;
     OSSL_LIB_CTX *libctx = NULL;
     EVP_PKEY *pkey = NULL;
     EVP_PKEY_CTX *ctx = NULL;
-    size_t decrypt_len = 0;
+    unsigned char *buf;
+    size_t buf_len;
 
     pkey = load_key_f(libctx, keyfile, EVP_PKEY_KEYPAIR);
     if(pkey == NULL){
@@ -261,35 +247,26 @@ myopenssl_d *myopenssl_decrypt_f(const char *keyfile, const unsigned char *in, c
     }
 
     OPENSSL_DEBUG("Message befor decrypt (length = %ld)(strlen = %ld):\n%s\n", in_len, strlen(in), in);
-    if(EVP_PKEY_decrypt(ctx, NULL, &decrypt_len, in, in_len) <= 0){
-        OPENSSL_DEBUG("Decrypt data step1 failed\n");
-        goto clean;
-    }
-
-    myopenssl_d *mp = malloc(sizeof(struct myopenssl_data));
-    if(mp == NULL){
+    size_t buf_size = 256*(1+(in_len/256));
+    buf = malloc(buf_size);
+    if(buf == NULL){
         OPENSSL_DEBUG("Malloc failed\n");
         goto clean;
     }
-    memset(mp, 0, sizeof(myopenssl_d));
+    memset(buf, 0, buf_size);
+    OPENSSL_DEBUG("Malloc %ld bytes buffer\n", buf_size);
 
-    OPENSSL_DEBUG("Decrypted string length = %ld\n", decrypt_len);
-    mp->data = OPENSSL_zalloc(decrypt_len);
-    if(mp->data == NULL){
-        OPENSSL_DEBUG("OPENSSL_zalloc failed\n");
-        myopenssl_d_free(mp);
-        goto clean;
-    }
-    mp->data_len = decrypt_len;
-
-    int decrypt_ret = EVP_PKEY_decrypt(ctx, mp->data, &mp->data_len, in, in_len);
+    int decrypt_ret = EVP_PKEY_decrypt(ctx, buf, &buf_len, in, in_len);
     if(decrypt_ret <= 0){
         OPENSSL_DEBUG("Decrypt data step2 failed\n");
-        myopenssl_d_free(mp);
+        free(buf);
         goto clean;
     }
-    OPENSSL_DEBUG("Decrypt data:\n%s\n", mp->data);
-    ret = mp;
+    OPENSSL_DEBUG("Decrypt data buffer:\n%s\n", buf);
+
+    memcpy(out, buf, buf_len);
+    free(buf);
+    ret = buf_len;
 
     clean:
     OSSL_LIB_CTX_free(libctx);
@@ -415,6 +392,7 @@ myopenssl_k *myopenssl_genkey(){
         myopenssl_k_free(mp);
         goto clean;
     }
+    mp->pubkey[mp->publen] = '\0';
 
     OPENSSL_DEBUG("Ready to write prikey\n");
     if(key_encode(pkey, &mp->privkey, &mp->privlen, EVP_PKEY_KEYPAIR) <= 0){
@@ -422,6 +400,7 @@ myopenssl_k *myopenssl_genkey(){
         myopenssl_k_free(mp);
         goto clean;
     }
+    mp->privkey[mp->privlen] = '\0';
 
     ret = mp;
 
@@ -463,13 +442,14 @@ static EVP_PKEY *load_key(OSSL_LIB_CTX *libctx, const unsigned char *key, size_t
     return pkey;
 }
 
-myopenssl_d *myopenssl_encrypt(const unsigned char *pubkey, const unsigned char *in, const size_t in_len){
+size_t myopenssl_encrypt(const unsigned char *pubkey, const unsigned char *in, const size_t in_len, unsigned char *out){
     OPENSSL_DEBUG("---Encrypt---\n");
-    myopenssl_d *ret = NULL;
+    size_t ret = 0;
     OSSL_LIB_CTX *libctx = NULL;
     EVP_PKEY *pkey = NULL;
     EVP_PKEY_CTX *ctx = NULL;
-    size_t data_len = 0;
+    unsigned char *buf;
+    size_t buf_len;
 
     pkey = load_key(libctx, pubkey, strlen(pubkey), EVP_PKEY_PUBLIC_KEY);
     if(pkey == NULL){
@@ -487,33 +467,25 @@ myopenssl_d *myopenssl_encrypt(const unsigned char *pubkey, const unsigned char 
         goto clean;
     }
 
-    if(EVP_PKEY_encrypt(ctx, NULL, &data_len, in, in_len) <= 0){
-        OPENSSL_DEBUG("Encrypt data step1 failed\n");
-        goto clean;
-    }
-
-    myopenssl_d *mp = malloc(sizeof(struct myopenssl_data));
-    if(!mp){
+    size_t buf_size = 256*(1+(in_len/245));
+    buf = malloc(buf_size);
+    if(buf == NULL){
         OPENSSL_DEBUG("Malloc failed\n");
         goto clean;
     }
-    memset(mp, 0, sizeof(myopenssl_d));
+    memset(buf, 0, buf_size);
+    OPENSSL_DEBUG("Malloc %ld bytes buffer\n", buf_size);
 
-    mp->data = OPENSSL_zalloc(data_len);
-    if(mp->data == NULL){
-        OPENSSL_DEBUG("OPENSSL_zalloc failed\n");
-        myopenssl_d_free(mp);
+    if(EVP_PKEY_encrypt(ctx, buf, &buf_len, in, in_len) <= 0){
+        OPENSSL_DEBUG("Encrypt data failed\n");
+        free(buf);
         goto clean;
     }
-    mp->data_len = data_len;
+    OPENSSL_DEBUG("Encrypt data buffer:\n%s\n", buf);
 
-    if(EVP_PKEY_encrypt(ctx, mp->data, &mp->data_len, in, in_len) <= 0){
-        OPENSSL_DEBUG("Encrypt data step2 failed\n");
-        myopenssl_d_free(mp);
-        goto clean;
-    }
-    OPENSSL_DEBUG("Encrypt data:\n%s\n", mp->data);
-    ret = mp;
+    memcpy(out, buf, buf_len);
+    free(buf);
+    ret = buf_len;
 
     clean:
     OSSL_LIB_CTX_free(libctx);
@@ -523,13 +495,14 @@ myopenssl_d *myopenssl_encrypt(const unsigned char *pubkey, const unsigned char 
     return ret;
 }
 
-myopenssl_d *myopenssl_decrypt(const unsigned char *privkey, const unsigned char *in, const size_t in_len){
+size_t myopenssl_decrypt(const unsigned char *privkey, const unsigned char *in, const size_t in_len, unsigned char *out){
     OPENSSL_DEBUG("---Decrypt---\n");
-    myopenssl_d *ret = NULL;
+    size_t ret = 0;
     OSSL_LIB_CTX *libctx = NULL;
     EVP_PKEY *pkey = NULL;
     EVP_PKEY_CTX *ctx = NULL;
-    size_t decrypt_len = 0;
+    unsigned char *buf;
+    size_t buf_len;
 
     pkey = load_key(libctx, privkey, strlen(privkey), EVP_PKEY_KEYPAIR);
     if(pkey == NULL){
@@ -547,36 +520,26 @@ myopenssl_d *myopenssl_decrypt(const unsigned char *privkey, const unsigned char
         goto clean;
     }
 
-    OPENSSL_DEBUG("Message befor decrypt (length = %ld)(strlen = %ld):\n%s\n", in_len, strlen(in), in);
-    if(EVP_PKEY_decrypt(ctx, NULL, &decrypt_len, in, in_len) <= 0){
-        OPENSSL_DEBUG("Decrypt data step1 failed\n");
-        goto clean;
-    }
-
-    myopenssl_d *mp = malloc(sizeof(struct myopenssl_data));
-    if(!mp){
+    size_t buf_size = 256*(1+(in_len/256));
+    buf = malloc(buf_size);
+    if(buf == NULL){
         OPENSSL_DEBUG("Malloc failed\n");
         goto clean;
     }
-    memset(mp, 0, sizeof(myopenssl_d));
+    memset(buf, 0, buf_size);
+    OPENSSL_DEBUG("Malloc %ld bytes buffer\n", buf_size);
 
-    OPENSSL_DEBUG("Decrypted string length = %ld\n", decrypt_len);
-    mp->data = OPENSSL_zalloc(decrypt_len);
-    if(mp->data == NULL){
-        OPENSSL_DEBUG("OPENSSL_zalloc failed\n");
-        myopenssl_d_free(mp);
-        goto clean;
-    }
-    mp->data_len = decrypt_len;
-
-    int decrypt_ret = EVP_PKEY_decrypt(ctx, mp->data, &mp->data_len, in, in_len);
+    int decrypt_ret = EVP_PKEY_decrypt(ctx, buf, &buf_len, in, in_len);
     if(decrypt_ret <= 0){
         OPENSSL_DEBUG("Decrypt data step2 failed (%d)\n", decrypt_ret);
-        myopenssl_d_free(mp);
+        free(buf);
         goto clean;
     }
-    OPENSSL_DEBUG("Decrypt data:\n%s\n", mp->data);
-    ret = mp;
+    OPENSSL_DEBUG("Decrypt data buffer:\n%s\n", buf);
+
+    memcpy(out, buf, buf_len);
+    free(buf);
+    ret = buf_len;
 
     clean:
     OSSL_LIB_CTX_free(libctx);
