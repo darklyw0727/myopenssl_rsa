@@ -193,7 +193,7 @@ size_t myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, const s
     }
 
     //Get encrypted data length
-    size_t buf_size = 256*(1+(in_len/245));
+    size_t buf_size = 256*(1+((in_len-1)/245));
     buf = malloc(buf_size);
     if(buf == NULL){
         OPENSSL_DEBUG("Malloc failed\n");
@@ -247,7 +247,7 @@ size_t myopenssl_decrypt_f(const char *keyfile, const unsigned char *in, const s
     }
 
     OPENSSL_DEBUG("Message befor decrypt (length = %ld)(strlen = %ld):\n%s\n", in_len, strlen(in), in);
-    size_t buf_size = 256*(1+(in_len/256));
+    size_t buf_size = 256*(1+((in_len-1)/256));
     buf = malloc(buf_size);
     if(buf == NULL){
         OPENSSL_DEBUG("Malloc failed\n");
@@ -467,7 +467,7 @@ size_t myopenssl_encrypt(const unsigned char *pubkey, const unsigned char *in, c
         goto clean;
     }
 
-    size_t buf_size = 256*(1+(in_len/245));
+    size_t buf_size = 256*(1+((in_len-1)/245));
     buf = malloc(buf_size);
     if(buf == NULL){
         OPENSSL_DEBUG("Malloc failed\n");
@@ -520,7 +520,7 @@ size_t myopenssl_decrypt(const unsigned char *privkey, const unsigned char *in, 
         goto clean;
     }
 
-    size_t buf_size = 256*(1+(in_len/256));
+    size_t buf_size = 256*(1+((in_len-1)/256));
     buf = malloc(buf_size);
     if(buf == NULL){
         OPENSSL_DEBUG("Malloc failed\n");

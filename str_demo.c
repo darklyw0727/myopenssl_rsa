@@ -12,7 +12,17 @@
 #include "myopenssl.h"
 #include "b64_codec.h"
 
-static const unsigned char msg[] = "This is the original msg";
+//static const unsigned char msg[] = "This is the original msg";
+static const unsigned char msg[] = "eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJoQis5WmlsSVtbIiwiYXVkIjoiYXNkIiwiZXhwIjoxNzE0NjE2MzI1LCJ0aWUiOiJObHoyTHNlMFBXTmJDcEYyR3NRT3c1dndHMDBSa21aYXNQekdHVVNlRXFNPSJ9.E8sAsjXel9bYFBoX_2_sIfwWBMerBb9K4x_Tr2tg9S0";
+const unsigned char testkey[] = "-----BEGIN PUBLIC KEY-----\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAn+7oYfwBgxt23Bac/UIP\n\
+uxnAVclEWBgHG80379QydkFTwKU85y9PNPHtQoIHOUeTdhxotBCL8NjrCMvxBEQ9\n\
+HOgPS9ChZhrPNYdbxw/rZmz1gmCDQxcK1JcfaXd/aRc9Va+CI5FNlZFFNSAC1XTI\n\
+9uyiDEFR1FYORviOMjebXCEqRe3zR2nigR5jPXBJVz1+gmFch3UrG07C29c2LkMK\n\
+qFpqPfOdM21ALwxEuwsBr3ADvHNjz4tR196i9v7uYgEO2+NzcSSBGWAm0KVJhfvM\n\
+XDFA0Wg4KQaaaN91DEPjc6NuKVtK0370/3/cL3GGpcP2BDKfszjTX4Tw3OROp5xt\n\
+sQIDAQAB\n\
+-----END PUBLIC KEY-----";
 
 char *to_b64(const unsigned char *in, const size_t in_len){
     size_t b64e_len = b64_encoded_size(in_len);
@@ -92,8 +102,8 @@ char *URLto64(char *in){
 }
 
 int main(int argc, char **argv){
-    myopenssl_k *mpk;
-    myopenssl_k *mp8;
+    myopenssl_k *mpk = NULL;
+    myopenssl_k *mp8 = NULL;
     //you need 256 bytes memory space for encrypt/decrypt output
     unsigned char enc[256];
     unsigned char dec[256];
@@ -111,19 +121,20 @@ int main(int argc, char **argv){
 
     //encrypt
     memset(enc, 0, sizeof(enc));
-    if((enc_len = myopenssl_encrypt(mpk->pubkey, msg, strlen(msg), enc)) == 0){
+    printf("testkey = %s\n",testkey);
+    if((enc_len = myopenssl_encrypt(testkey, msg, strlen(msg), enc)) == 0){
         printf("Encrypt failed\n");
-        goto clean;
+        goto clean1;
     }
     printf("Encrypted data (length = %ld)(sizeof = %ld):\n%s\n\n", enc_len, sizeof(enc), enc);
 
     //base64 encode
     char *b64e = to_b64(enc, enc_len);
-    if(b64e == NULL) goto clean;
+    if(b64e == NULL) goto clean1;
 
     //base64 decode
     char *b64d = from_b64(b64e);
-    if(b64d == NULL) goto clean;
+    if(b64d == NULL) goto clean2;
 
     //decrypt
     memset(dec, 0, sizeof(dec));
@@ -155,10 +166,12 @@ int main(int argc, char **argv){
     printf("All finish\n");
     //remember free the PKCS#1 and PKCS#8 format pub/privkey after used
     clean:
+    if(b64d) free(b64d);
+    clean2:
+    if(b64e) free(b64e);
+    clean1:
     if(mp8) myopenssl_k_free(mp8);
     if(mpk) myopenssl_k_free(mpk);
-    if(b64e) free(b64e);
-    if(b64d) free(b64d);
     
     return 0;
 }
