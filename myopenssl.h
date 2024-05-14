@@ -15,47 +15,13 @@
 */
 
 typedef struct myopenssl_key {
-    unsigned char *pubkey;
+    char *pubkey;
     size_t publen;
-    unsigned char *privkey;
+    char *privkey;
     size_t privlen;
 } myopenssl_k;
 
 void myopenssl_k_free(myopenssl_k *ptr);
-
-/**
- * Create RSA public & private key in PEM format file
- * @param pubkey_file <in> where to save public key
- * @param privkey_file <in> where to save private key
- * @returns 1 (successes) or 0
-*/
-int myopenssl_genkey_f(const char *pubkey_file, const char *privkey_file);
-/**
- * Encrypt input
- * @param keyfile <in> where is the public key
- * @param in <in> input string
- * @param in_len <in> input length
- * @param out <out> output data
- * @returns 0 (error) or output length
-*/
-size_t myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char *out);
-/**
- * Decrypt input. Please decode input, if it is base64/base64url encoded
- * @param keyfile <in> where is the private key
- * @param in <in> input string
- * @param in_len <in> input length
- * @param out <out> output data
- * @returns 0 (error) or output length
-*/
-size_t myopenssl_decrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char *out);
-/**
- * Create a PKCS#8 PEM key form PKCS#1 PEM key
- * @param infile <in> where is the PKCS#1 PEM key file
- * @param public <in> pubkey or privkey, 1 or 0
- * @param outfile <out> where to save the PKCS#8 PEM key
- * @returns 1 (successes) or 0
-*/
-int myopenssl_pkcs8_f(const char *infile, const int public, const char *outfile);
 
 /**
  * Create RSA public & private key in PEM format string
@@ -63,28 +29,47 @@ int myopenssl_pkcs8_f(const char *infile, const int public, const char *outfile)
 */
 myopenssl_k *myopenssl_genkey();
 /**
- * Encrypt input
+ * Encrypt input, make sure your output buffer is enough and clean
  * @param pubkey <in> pubkey string
  * @param in <in> input string
  * @param in_len <in> input length
- * @param out <out> output data
+ * @param out <out> output data, make sure it is enough and clean
  * @returns 0 (error) or output length
 */
-size_t myopenssl_encrypt(const unsigned char *pubkey, const unsigned char *in, const size_t in_len, unsigned char *out);
+size_t myopenssl_encrypt(const char *pubkey, const unsigned char *in, const size_t in_len, unsigned char *out);
 /**
- * Decrypt input. Please decode input, if it is base64/base64url encoded
+ * Decrypt input, make sure your output buffer is enough and clean. Please decode input, if it is base64/base64url encoded
  * @param privkey <in> privkey string
  * @param in <in> input string
  * @param in_len <in> input length
- * @param out <out> output data
+ * @param out <out> output data, make sure it is enough and clean
  * @returns 0 (error) or output length
 */
-size_t myopenssl_decrypt(const unsigned char *privkey, const unsigned char *in, const size_t in_len, unsigned char *out);
+size_t myopenssl_decrypt(const char *privkey, const unsigned char *in, const size_t in_len, unsigned char *out);
+
 /**
- * Create a PKCS#8 PEM key string form PKCS#1 PEM key string
- * @param in <in> PKCS#1 PEM key string
- * @param public <in> pubkey or privkey, 1 or 0
- * @returns NULL (error) or myopenssl_k that include PKCS#8 pubkey/privkey string and their length
+ * Create RSA public & private key in PEM format file
+ * @param pubkey_file <in> where to save public key
+ * @param privkey_file <in> where to save private key
+ * @returns 0 (successes) or -1
 */
-myopenssl_k *myopenssl_pkcs8(const unsigned char *in, const int public);
+int myopenssl_genkey_f(const char *pubkey_file, const char *privkey_file);
+/**
+ * Encrypt input, make sure your output buffer is enough and clean
+ * @param keyfile <in> where is the public key
+ * @param in <in> input string
+ * @param in_len <in> input length
+ * @param out <out> output data, make sure it is enough and clean
+ * @returns 0 (error) or output length
+*/
+size_t myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char *out);
+/**
+ * Decrypt input, make sure your output buffer is enough and clean. Please decode input, if it is base64/base64url encoded
+ * @param keyfile <in> where is the private key
+ * @param in <in> input string
+ * @param in_len <in> input length
+ * @param out <out> output data, make sure it is enough and clean
+ * @returns 0 (error) or output length
+*/
+size_t myopenssl_decrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char *out);
 #endif

@@ -14,6 +14,7 @@
 #include <openssl/encoder.h>
 #include <openssl/decoder.h>
 #include <openssl/pem.h>
+#include <openssl/bio.h>
 #include "myopenssl.h"
 
 void myopenssl_k_free(myopenssl_k *ptr){
@@ -25,331 +26,52 @@ void myopenssl_k_free(myopenssl_k *ptr){
     OPENSSL_DEBUG("free 3/3\n");
 }
 
-static int key_encode_f(EVP_PKEY *pkey, FILE *f, const int selection){
+static size_t key_encode(EVP_PKEY *pkey, char **out, const int public){
     OPENSSL_DEBUG("---Key encode---\n");
-    int ret = 0;
+    size_t  ret = 0;
+    BIO *bio = NULL;
+    char *bio_data;
+    long data_len;
+    char *buf;
 
-    //create encoder for PEM fomat
-    OSSL_ENCODER_CTX *ectx = OSSL_ENCODER_CTX_new_for_pkey(pkey, selection, "PEM", NULL, NULL);
-    if(ectx == NULL){
-        printf("Fail to creat encoder\n");
-        goto clean;
-    }
-    OPENSSL_DEBUG("encode step1\n");
-
-    //encode key
-    if(OSSL_ENCODER_to_fp(ectx, f) == 0){
-        printf("Fail to encode\n");
-        goto clean;
-    }
-    OPENSSL_DEBUG("encode step2\n");
-    ret = 1;
-
-    clean:
-    OSSL_ENCODER_CTX_free(ectx);
-    OPENSSL_DEBUG("---Encode finish---\n");
-    return ret;
-}
-
-int myopenssl_genkey_f(const char *pubkey_file, const char *privkey_file){
-    OPENSSL_DEBUG("---myopenssl_genkey_f()---\n");
-    int ret = 0;
-    EVP_PKEY_CTX *ctx = NULL;
-    EVP_PKEY *pkey = NULL;
-
-    //Create EVP_PKEY_CTX for RSA
-    ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
-    if(!ctx){
-        OPENSSL_DEBUG("Fail to creat ctx\n");
-        goto clean;
-    }
-    if(EVP_PKEY_keygen_init(ctx) <= 0){
-        OPENSSL_DEBUG("Fail to init ctx\n");
+    if((bio = BIO_new(BIO_s_mem())) == NULL){
+        OPENSSL_DEBUG("Fail to create bio\n");
         goto clean;
     }
 
-    //Set RSA key to 2048 bits
-    if(EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, 2048) <= 0){
-        OPENSSL_DEBUG("Fail to set RSA key length\n");
-        goto clean;
-    }
-
-    //Gen RSA key
-    if(EVP_PKEY_keygen(ctx, &pkey) <= 0){
-        OPENSSL_DEBUG("Fail to genaration RSA key\n");
-        goto clean;
-    }
-
-    //Write key to PEM key file
-    OPENSSL_DEBUG("Ready to write pubkey\n");
-    FILE *fkey = fopen(pubkey_file,"w+");
-    if(fkey != NULL){
-        if(key_encode_f(pkey, fkey, EVP_PKEY_PUBLIC_KEY) == 0){
-            fclose(fkey);
-            goto clean;
-        }
-        fclose(fkey);
-    }else{
-        OPENSSL_DEBUG("Pubkey create failed\n");
-        goto clean;
-    }
-
-    OPENSSL_DEBUG("Ready to write prikey\n");
-    fkey = fopen(privkey_file,"w+");
-    if(fkey != NULL){
-        if(key_encode_f(pkey, fkey, EVP_PKEY_KEYPAIR) == 0){
-            fclose(fkey);
-            goto clean;
-        }
-        fclose(fkey);
-    }else{
-        OPENSSL_DEBUG("Privekey create failed\n");
-        goto clean;
-    }
-
-    ret = 1;
-
-    clean:
-    EVP_PKEY_CTX_free(ctx);
-    EVP_PKEY_free(pkey);
-    OPENSSL_DEBUG("---myopenssl_genkey_f() finish---\n");
-    return ret;
-}
-
-static EVP_PKEY *load_key_f(OSSL_LIB_CTX *libctx, const char *keyfile, const int selection){
-    OPENSSL_DEBUG("---Load key---\n");
-    OSSL_DECODER_CTX *dctx = NULL;
-    EVP_PKEY *key = NULL;
-    unsigned char keychar[2048];
-    ssize_t key_len;
-    int fd;
-    
-    //Read key from PEM key file
-    if((fd = open(keyfile, O_RDWR, 0666)) < 0){
-        OPENSSL_DEBUG("Open %s failed\n", keyfile);
-        goto clean;
-    }
-
-    memset(keychar, 0, sizeof(keychar));
-    if((key_len = read(fd, keychar, 2048)) < 0){
-        OPENSSL_DEBUG("Read %s failed\n", keyfile);
-        goto clean;
-    }
-    OPENSSL_DEBUG("Key length = %ld\n", key_len);
-
-    //Create decoder for RSA PEM key
-    OPENSSL_DEBUG("---Key decode---\n");
-    dctx = OSSL_DECODER_CTX_new_for_pkey(&key, "PEM", NULL, "RSA", selection, libctx, NULL);
-    if(dctx == NULL){
-        OPENSSL_DEBUG("Fail to creat decoder\n");
-        key = NULL;
-        goto clean;
-    }
-    OPENSSL_DEBUG("Decode step1\n");
-
-    const unsigned char *data;
-    data = keychar;
-
-    //Create EVP_PKEY from PEM key
-    if(OSSL_DECODER_from_data(dctx, &data, &key_len) <= 0){
-        OPENSSL_DEBUG("Fail to decode\n");
-        key = NULL;
-        goto clean;
-    }
-    OPENSSL_DEBUG("Decode step2\n");
-
-    clean:
-    OSSL_DECODER_CTX_free(dctx);
-    OPENSSL_DEBUG("---Decode finish---\n");
-    OPENSSL_DEBUG("---Load key finish---\n");
-    return key;
-}
-
-size_t myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char *out){
-    OPENSSL_DEBUG("---Encrypt---\n");
-    size_t ret = 0;
-    OSSL_LIB_CTX *libctx = NULL;
-    EVP_PKEY *pkey = NULL;
-    EVP_PKEY_CTX *ctx = NULL;
-    unsigned char *buf;
-    size_t buf_len;
-
-    //Load key
-    pkey = load_key_f(libctx, keyfile, EVP_PKEY_PUBLIC_KEY);
-    if(pkey == NULL){
-        OPENSSL_DEBUG("Pub EVP_PKEY is NULL\n");
-        goto clean;
-    }else OPENSSL_DEBUG("Get pub EVP_PKEY\n");
-
-    //Use EVP_PKEY to create EVP_PKEY_CTX for encrypt
-    ctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkey, NULL);
-    if(!ctx){
-        OPENSSL_DEBUG("Fail to creat ctx\n");
-        goto clean;
-    }
-    if(EVP_PKEY_encrypt_init(ctx) <= 0){
-        OPENSSL_DEBUG("Encrypt init failed\n");
-        goto clean;
-    }
-
-    //Get encrypted data length
-    size_t buf_size = 256*(1+((in_len-1)/245));
-    buf = malloc(buf_size);
-    if(buf == NULL){
-        OPENSSL_DEBUG("Malloc failed\n");
-        goto clean;
-    }
-    memset(buf, 0, buf_size);
-
-    //Encrypt
-    if(EVP_PKEY_encrypt(ctx, buf, &buf_len, in, in_len) <= 0){
-        OPENSSL_DEBUG("Encrypt data step2 failed\n");
-        free(buf);
-        goto clean;
-    }
-    OPENSSL_DEBUG("Encrypt data buffer:\n%s\n", buf);
-
-    memcpy(out, buf, buf_len);
-    free(buf);
-    ret = buf_len;
-
-    clean:
-    OSSL_LIB_CTX_free(libctx);
-    EVP_PKEY_free(pkey);
-    EVP_PKEY_CTX_free(ctx);
-    OPENSSL_DEBUG("---Encrypt finish---\n");
-    return ret;
-}
-
-size_t myopenssl_decrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char *out){
-    OPENSSL_DEBUG("---Decrypt---\n");
-    size_t ret = 0;
-    OSSL_LIB_CTX *libctx = NULL;
-    EVP_PKEY *pkey = NULL;
-    EVP_PKEY_CTX *ctx = NULL;
-    unsigned char *buf;
-    size_t buf_len;
-
-    pkey = load_key_f(libctx, keyfile, EVP_PKEY_KEYPAIR);
-    if(pkey == NULL){
-        OPENSSL_DEBUG("Priv EVP_PKEY is NULL\n");
-        goto clean;
-    }else OPENSSL_DEBUG("Get priv EVP_PKEY\n");
-
-    ctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkey, NULL);
-    if(!ctx){
-        OPENSSL_DEBUG("Fail to creat ctx\n");
-        goto clean;
-    }
-    if(EVP_PKEY_decrypt_init(ctx) <= 0){
-        OPENSSL_DEBUG("Decrypt init failed\n");
-        goto clean;
-    }
-
-    OPENSSL_DEBUG("Message befor decrypt (length = %ld)(strlen = %ld):\n%s\n", in_len, strlen(in), in);
-    size_t buf_size = 256*(1+((in_len-1)/256));
-    buf = malloc(buf_size);
-    if(buf == NULL){
-        OPENSSL_DEBUG("Malloc failed\n");
-        goto clean;
-    }
-    memset(buf, 0, buf_size);
-    OPENSSL_DEBUG("Malloc %ld bytes buffer\n", buf_size);
-
-    int decrypt_ret = EVP_PKEY_decrypt(ctx, buf, &buf_len, in, in_len);
-    if(decrypt_ret <= 0){
-        OPENSSL_DEBUG("Decrypt data step2 failed\n");
-        free(buf);
-        goto clean;
-    }
-    OPENSSL_DEBUG("Decrypt data buffer:\n%s\n", buf);
-
-    memcpy(out, buf, buf_len);
-    free(buf);
-    ret = buf_len;
-
-    clean:
-    OSSL_LIB_CTX_free(libctx);
-    EVP_PKEY_free(pkey);
-    EVP_PKEY_CTX_free(ctx);
-    OPENSSL_DEBUG("---Decrypt finish---\n");
-    return ret;
-}
-
-int myopenssl_pkcs8_f(const char *infile, const int public, const char *outfile){
-    OPENSSL_DEBUG("---Make PKCS#8 key---\n");
-    int ret = 0;
-    int selection;
-    OSSL_LIB_CTX *libctx = NULL;
-    EVP_PKEY *pkey = NULL;
-    FILE *pkcs8 = NULL;
-
-    if(public == 1) selection = EVP_PKEY_PUBLIC_KEY;
-    else selection = EVP_PKEY_KEYPAIR;
-
-    //Get EVP_PKEY from PEM key file
-    pkey = load_key_f(libctx, infile, selection);
-    if(pkey == NULL){
-        OPENSSL_DEBUG("Can't get EVP_KEY from %s\n", infile);
-        goto clean;
-    }else OPENSSL_DEBUG("Get EVP_PKEY from %s\n", infile);
-
-    //Create PKCS#8 PEM key file
-    pkcs8 = fopen(outfile, "w");
-    if(pkcs8 == NULL){
-        OPENSSL_DEBUG("Can't creat pkcs8 file %s\n", outfile);
-        goto clean;
-    }else OPENSSL_DEBUG("Creat pkcs8 file %s\n", outfile);
-
-    //Write Pubkey or privkey
     if(public == 1){
-        if(PEM_write_PUBKEY(pkcs8, pkey) <= 0){
-            OPENSSL_DEBUG("Can't write %s\n", outfile);
+        OPENSSL_DEBUG("Create pubkey\n");
+        if(PEM_write_bio_PUBKEY(bio, pkey) == 0){
+            OPENSSL_DEBUG("PEM_write_bio_PUBKEY() failed\n");
             goto clean;
-        }else OPENSSL_DEBUG("Write key to pkcs8 file %s\n", outfile);
+        }
     }else{
-        if(PEM_write_PKCS8PrivateKey(pkcs8, pkey, NULL, NULL, 0, NULL, NULL) <= 0){
-            OPENSSL_DEBUG("Can't write %s\n", outfile);
+        OPENSSL_DEBUG("Create prikey\n");
+        if(PEM_write_bio_PrivateKey(bio, pkey, NULL, NULL, 0, NULL, NULL) == 0){
+            OPENSSL_DEBUG("PEM_write_bio_PrivateKey() failed\n");
             goto clean;
-        }else OPENSSL_DEBUG("Write key to pkcs8 file %s\n", outfile);
+        }
     }
 
-    ret = 1;
-
-    clean:
-    EVP_PKEY_free(pkey);
-    OSSL_LIB_CTX_free(libctx);
-    if(pkcs8 != NULL) fclose(pkcs8);
-    OPENSSL_DEBUG("---Make PKCS#8 key finish---\n");
-    return ret;
-}
-
-static int key_encode(EVP_PKEY *pkey, unsigned char **out, size_t *out_len, const int selection){
-    OPENSSL_DEBUG("---Key encode---\n");
-    int ret = 0;
-    unsigned char *buf = NULL;
-    size_t buf_len;
-
-    OSSL_ENCODER_CTX *ectx = OSSL_ENCODER_CTX_new_for_pkey(pkey, selection, "PEM", NULL, NULL);
-    if(ectx == NULL){
-        printf("Fail to creat encoder\n");
+    if((data_len = BIO_get_mem_data(bio, &bio_data)) <= 0){
+        OPENSSL_DEBUG("BIO_get_mem_data() failed (retrun val = %ld)\n", data_len);
         goto clean;
     }
-    OPENSSL_DEBUG("encode step1\n");
 
-    if(OSSL_ENCODER_to_data(ectx, &buf, &buf_len) == 0){
-        printf("Fail to encode\n");
+    if((buf = malloc((size_t)data_len + 1)) == NULL){
+        OPENSSL_DEBUG("out malloc failed\n");
         goto clean;
     }
-    OPENSSL_DEBUG("encode step2\n");
 
+    strcpy(buf, bio_data);
+    buf[data_len] = '\0';
     *out = buf;
-    *out_len = buf_len;
-    ret = 1;
+
+    ret = (size_t)data_len;
+    OPENSSL_DEBUG("---Key encode done---\n");
 
     clean:
-    OSSL_ENCODER_CTX_free(ectx);
-    OPENSSL_DEBUG("---Encode finish---\n");
+    if(bio) BIO_free(bio);
     return ret;
 }
 
@@ -379,6 +101,7 @@ myopenssl_k *myopenssl_genkey(){
         goto clean;
     }
 
+    //Create myopenssl_k struct
     myopenssl_k *mp = malloc(sizeof(struct myopenssl_key));
     if(!mp){
         OPENSSL_DEBUG("Malloc failed\n");
@@ -386,80 +109,83 @@ myopenssl_k *myopenssl_genkey(){
     }
     memset(mp, 0, sizeof(myopenssl_k));
 
-    OPENSSL_DEBUG("Ready to write pubkey\n");
-    if(key_encode(pkey, &mp->pubkey, &mp->publen, EVP_PKEY_PUBLIC_KEY) <= 0){
-        OPENSSL_DEBUG("Pubkey create failed\n");
-        myopenssl_k_free(mp);
-        goto clean;
-    }
-    mp->pubkey[mp->publen] = '\0';
-
     OPENSSL_DEBUG("Ready to write prikey\n");
-    if(key_encode(pkey, &mp->privkey, &mp->privlen, EVP_PKEY_KEYPAIR) <= 0){
-        OPENSSL_DEBUG("Privkey create failed\n");
+    if((mp->privlen = key_encode(pkey, &mp->privkey, 0)) == 0){
+        OPENSSL_DEBUG("Encode privkey failed\n");
         myopenssl_k_free(mp);
         goto clean;
     }
-    mp->privkey[mp->privlen] = '\0';
+
+    OPENSSL_DEBUG("Ready to write pubkey\n");
+    if((mp->publen = key_encode(pkey, &mp->pubkey, 1)) == 0){
+        OPENSSL_DEBUG("Encode pubkey failed\n");
+        myopenssl_k_free(mp);
+        goto clean;
+    }
 
     ret = mp;
 
     clean:
-    EVP_PKEY_CTX_free(ctx);
-    EVP_PKEY_free(pkey);
+    if(ctx) EVP_PKEY_CTX_free(ctx);
+    if(pkey) EVP_PKEY_free(pkey);
     OPENSSL_DEBUG("---myopenssl_genkey() finish---\n");
     return ret;
 }
 
-static EVP_PKEY *load_key(OSSL_LIB_CTX *libctx, const unsigned char *key, size_t key_len, const int selection){
-    OPENSSL_DEBUG("---Load key---\n");
-    OSSL_DECODER_CTX *dctx = NULL;
+static EVP_PKEY *key_decode(const char *in, const int public){
+    OPENSSL_DEBUG("---key decode---\n");
+    EVP_PKEY *ret = NULL;
+    BIO *bio = NULL;
     EVP_PKEY *pkey = NULL;
 
-    OPENSSL_DEBUG("---Key decode---\n");
-    dctx = OSSL_DECODER_CTX_new_for_pkey(&pkey, "PEM", NULL, "RSA", selection, libctx, NULL);
-    if(dctx == NULL){
-        OPENSSL_DEBUG("Fail to creat decoder\n");
-        pkey = NULL;
+    if((bio = BIO_new_mem_buf(in, -1)) == NULL){
+        OPENSSL_DEBUG("Fail to create bio\n");
         goto clean;
     }
-    OPENSSL_DEBUG("Decode step1\n");
 
-    const unsigned char *data;
-    data = key;
-
-    if(OSSL_DECODER_from_data(dctx, &data, &key_len) <= 0){
-        OPENSSL_DEBUG("Fail to decode\n");
-        pkey = NULL;
-        goto clean;
+    if(public == 1){
+        if((pkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL)) == NULL){
+            OPENSSL_DEBUG("PEM_read_bio_PUBKEY faild\n");
+            goto clean;
+        }
+    }else{
+        if((pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL)) == NULL){
+            OPENSSL_DEBUG("PEM_read_bio_PrivateKey faild\n");
+            goto clean;
+        }
     }
-    OPENSSL_DEBUG("Decode step2\n");
+
+    ret = pkey;
+    OPENSSL_DEBUG("---key decode done---\n");
 
     clean:
-    OSSL_DECODER_CTX_free(dctx);
-    OPENSSL_DEBUG("---Decode finish---\n");
-    OPENSSL_DEBUG("---Load key finish---\n");
-    return pkey;
+    if(bio) BIO_free(bio);
+    return ret;
 }
 
-size_t myopenssl_encrypt(const unsigned char *pubkey, const unsigned char *in, const size_t in_len, unsigned char *out){
+size_t myopenssl_encrypt(const char *pubkey, const unsigned char *in, const size_t in_len, unsigned char *out){
     OPENSSL_DEBUG("---Encrypt---\n");
     size_t ret = 0;
-    OSSL_LIB_CTX *libctx = NULL;
     EVP_PKEY *pkey = NULL;
     EVP_PKEY_CTX *ctx = NULL;
-    unsigned char *buf;
-    size_t buf_len;
+    size_t out_len;
 
-    pkey = load_key(libctx, pubkey, strlen(pubkey), EVP_PKEY_PUBLIC_KEY);
+    //check input
+    if(!pubkey || !in || (in_len <= 1)){
+        OPENSSL_DEBUG("Input error\n");
+        return ret;
+    }
+
+    //decode key to EVP_PKEY
+    pkey = key_decode(pubkey, 1);
     if(pkey == NULL){
         OPENSSL_DEBUG("Pub EVP_PKEY is NULL\n");
         goto clean;
     }else OPENSSL_DEBUG("Get pub EVP_PKEY\n");
 
-    ctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkey, NULL);
-    if(!ctx){
-        OPENSSL_DEBUG("Fail to creat ctx\n");
+    //create EVP_PKEY_CTX
+    if((ctx = EVP_PKEY_CTX_new(pkey, NULL)) == NULL){
+        OPENSSL_DEBUG("Fail to create ctx\n");
         goto clean;
     }
     if(EVP_PKEY_encrypt_init(ctx) <= 0){
@@ -467,52 +193,45 @@ size_t myopenssl_encrypt(const unsigned char *pubkey, const unsigned char *in, c
         goto clean;
     }
 
-    size_t buf_size = 256*(1+((in_len-1)/245));
-    buf = malloc(buf_size);
-    if(buf == NULL){
-        OPENSSL_DEBUG("Malloc failed\n");
-        goto clean;
-    }
-    memset(buf, 0, buf_size);
-    OPENSSL_DEBUG("Malloc %ld bytes buffer\n", buf_size);
-
-    if(EVP_PKEY_encrypt(ctx, buf, &buf_len, in, in_len) <= 0){
+    //encrypt
+    if(EVP_PKEY_encrypt(ctx, out, &out_len, in, in_len) <= 0){
         OPENSSL_DEBUG("Encrypt data failed\n");
-        free(buf);
         goto clean;
     }
-    OPENSSL_DEBUG("Encrypt data buffer:\n%s\n", buf);
+    OPENSSL_DEBUG("Encrypted data buffer (length = %ld) :\n%s\n", out_len, out);
 
-    memcpy(out, buf, buf_len);
-    free(buf);
-    ret = buf_len;
+    ret = out_len;
+    OPENSSL_DEBUG("---Encrypt done---\n");
 
     clean:
-    OSSL_LIB_CTX_free(libctx);
-    EVP_PKEY_free(pkey);
-    EVP_PKEY_CTX_free(ctx);
-    OPENSSL_DEBUG("---Encrypt finish---\n");
+    if(pkey) EVP_PKEY_free(pkey);
+    if(ctx) EVP_PKEY_CTX_free(ctx);
     return ret;
 }
 
-size_t myopenssl_decrypt(const unsigned char *privkey, const unsigned char *in, const size_t in_len, unsigned char *out){
+size_t myopenssl_decrypt(const char *privkey, const unsigned char *in, const size_t in_len, unsigned char *out){
     OPENSSL_DEBUG("---Decrypt---\n");
     size_t ret = 0;
-    OSSL_LIB_CTX *libctx = NULL;
     EVP_PKEY *pkey = NULL;
     EVP_PKEY_CTX *ctx = NULL;
-    unsigned char *buf;
-    size_t buf_len;
+    size_t out_len;
 
-    pkey = load_key(libctx, privkey, strlen(privkey), EVP_PKEY_KEYPAIR);
+    //check input
+    if(!privkey || !in || (in_len <= 1)){
+        OPENSSL_DEBUG("Input error\n");
+        return ret;
+    }
+
+    //decode key to EVP_PKEY
+    pkey = key_decode(privkey, 0);
     if(pkey == NULL){
         OPENSSL_DEBUG("Priv EVP_PKEY is NULL\n");
         goto clean;
-    }else OPENSSL_DEBUG("Get priv EVP_PKEY\n");
+    }else OPENSSL_DEBUG("Get Priv EVP_PKEY\n");
 
-    ctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkey, NULL);
-    if(!ctx){
-        OPENSSL_DEBUG("Fail to creat ctx\n");
+    //create EVP_PKEY_CTX
+    if((ctx = EVP_PKEY_CTX_new(pkey, NULL)) == NULL){
+        OPENSSL_DEBUG("Fail to create ctx\n");
         goto clean;
     }
     if(EVP_PKEY_decrypt_init(ctx) <= 0){
@@ -520,128 +239,206 @@ size_t myopenssl_decrypt(const unsigned char *privkey, const unsigned char *in, 
         goto clean;
     }
 
-    size_t buf_size = 256*(1+((in_len-1)/256));
-    buf = malloc(buf_size);
-    if(buf == NULL){
-        OPENSSL_DEBUG("Malloc failed\n");
-        goto clean;
-    }
-    memset(buf, 0, buf_size);
-    OPENSSL_DEBUG("Malloc %ld bytes buffer\n", buf_size);
-
-    int decrypt_ret = EVP_PKEY_decrypt(ctx, buf, &buf_len, in, in_len);
+    //decrypt
+    int decrypt_ret = EVP_PKEY_decrypt(ctx, out, &out_len, in, in_len);
     if(decrypt_ret <= 0){
         OPENSSL_DEBUG("Decrypt data step2 failed (%d)\n", decrypt_ret);
-        free(buf);
         goto clean;
     }
-    OPENSSL_DEBUG("Decrypt data buffer:\n%s\n", buf);
+    OPENSSL_DEBUG("Decrypt data buffer (length = %ld) :\n%s\n", out_len, out);
 
-    memcpy(out, buf, buf_len);
-    free(buf);
-    ret = buf_len;
+    ret = out_len;
+    OPENSSL_DEBUG("---Decrypt done---\n");
 
     clean:
-    OSSL_LIB_CTX_free(libctx);
     EVP_PKEY_free(pkey);
     EVP_PKEY_CTX_free(ctx);
-    OPENSSL_DEBUG("---Decrypt finish---\n");
     return ret;
 }
 
-myopenssl_k *myopenssl_pkcs8(const unsigned char *in, const int public){
-    OPENSSL_DEBUG("---Make PKCS#8 key---\n");
-    myopenssl_k *ret = NULL;
-    OSSL_LIB_CTX *libctx = NULL;
+int myopenssl_genkey_f(const char *pubkey_file, const char *privkey_file){
+    OPENSSL_DEBUG("---myopenssl_genkey_f()---\n");
+    int ret = -1;
+    EVP_PKEY_CTX *ctx = NULL;
     EVP_PKEY *pkey = NULL;
-    FILE *tmp = NULL;
-    int selection;
-    char buf[2048];
-    size_t buf_len;
-    myopenssl_k *mp = NULL;
 
-    if(public == 1) selection = EVP_PKEY_PUBLIC_KEY;
-    else selection = EVP_PKEY_KEYPAIR;
-
-    pkey = load_key(libctx, in, strlen(in), selection);
-    if(pkey == NULL){
-        OPENSSL_DEBUG("Can't get EVP_KEY\n");
+    //Create EVP_PKEY_CTX for RSA
+    ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+    if(!ctx){
+        OPENSSL_DEBUG("Fail to creat ctx\n");
         goto clean;
-    }else OPENSSL_DEBUG("Get EVP_PKEY\n");
+    }
+    if(EVP_PKEY_keygen_init(ctx) <= 0){
+        OPENSSL_DEBUG("Fail to init ctx\n");
+        goto clean;
+    }
 
-    tmp = tmpfile();
-    if(tmp == NULL){
-        OPENSSL_DEBUG("Can't creat pkcs8 tmp file\n");
+    //Set RSA key to 2048 bits
+    if(EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, 2048) <= 0){
+        OPENSSL_DEBUG("Fail to set RSA key length\n");
+        goto clean;
+    }
+
+    //Gen RSA key
+    if(EVP_PKEY_keygen(ctx, &pkey) <= 0){
+        OPENSSL_DEBUG("Fail to genaration RSA key\n");
+        goto clean;
+    }
+
+    //Write key to PEM key file
+    OPENSSL_DEBUG("Ready to write prikey\n");
+    FILE *fkey = fopen(privkey_file,"w+");
+    if(!fkey){
+        OPENSSL_DEBUG("Privkey create failed\n");
+        goto clean;
+    }
+    if(PEM_write_PrivateKey(fkey, pkey, NULL, NULL, 0, NULL, NULL) == 0){
+        OPENSSL_DEBUG("PEM_write_PrivateKey() failed\n");
+        goto clean;
+    }
+    fclose(fkey);
+
+    OPENSSL_DEBUG("Ready to write pubkey\n");
+    fkey = fopen(pubkey_file,"w+");
+    if(!fkey){
+        OPENSSL_DEBUG("Pubkey create failed\n");
+        goto clean;
+    }
+    if(PEM_write_PUBKEY(fkey, pkey) == 0){
+        OPENSSL_DEBUG("PEM_write_PUBKEY() failed\n");
+        goto clean;
+    }
+    fclose(fkey);
+
+    ret = 0;
+
+    clean:
+    if(ctx) EVP_PKEY_CTX_free(ctx);
+    if(pkey) EVP_PKEY_free(pkey);
+    OPENSSL_DEBUG("---myopenssl_genkey_f() finish---\n");
+    return ret;
+}
+
+static EVP_PKEY *key_decode_f(const char *key_file, const int public){
+    OPENSSL_DEBUG("---key decode---\n");
+    EVP_PKEY *ret = NULL;
+    EVP_PKEY *pkey = NULL;
+    FILE *fp = NULL;
+
+    if((fp = fopen(key_file, "r")) == NULL){
+        OPENSSL_DEBUG("Fail to open %s\n", key_file);
         goto clean;
     }
 
     if(public == 1){
-        if(PEM_write_PUBKEY(tmp, pkey) <= 0){
-            OPENSSL_DEBUG("Can't write pkcs8 file\n");
-            fclose(tmp);
-            goto clean;
-        }else OPENSSL_DEBUG("Write key to pkcs8 file\n");
-    }else{
-        if(PEM_write_PKCS8PrivateKey(tmp, pkey, NULL, NULL, 0, NULL, NULL) <= 0){
-            OPENSSL_DEBUG("Can't write pkcs8 file\n");
-            fclose(tmp);
-            goto clean;
-        }else OPENSSL_DEBUG("Write key to pkcs8 file\n");
-    }
-
-    if(fseek(tmp, 0, SEEK_SET) != 0){
-        OPENSSL_DEBUG("Can't seek pkcs8 file\n");
-        fclose(tmp);
-        goto clean;
-    }
-    memset(buf, 0 ,sizeof(buf));
-    buf_len = fread(buf, sizeof(char), 2048, tmp);
-    fclose(tmp);
-
-    if(buf_len <= 0){
-        OPENSSL_DEBUG("Can't read pkcs8 file\n");
-        goto clean;
-    }else{
-        OPENSSL_DEBUG("Buffer data from tmp (length = %ld) =\n%s\n", buf_len, buf);
-        mp = malloc(sizeof(struct myopenssl_key));
-        if(!mp){
-            OPENSSL_DEBUG("Malloc failed\n");
+        if((pkey = PEM_read_PUBKEY(fp, NULL, NULL, NULL)) == NULL){
+            OPENSSL_DEBUG("PEM_read_bio_PUBKEY faild\n");
             goto clean;
         }
-        memset(mp, 0, sizeof(myopenssl_k));
-
-        if(public == 1){
-            mp->pubkey = malloc(buf_len+1);
-            if(!mp->pubkey){
-                OPENSSL_DEBUG("Malloc failed\n");
-                myopenssl_k_free(mp);
-                goto clean;
-            }
-            memset(mp->pubkey, 0, buf_len+1);
-            mp->publen = buf_len;
-
-            strcpy(mp->pubkey, buf);
-            OPENSSL_DEBUG("Final output (length = %ld) =\n%s\n", mp->publen, mp->pubkey);
-        }else{
-            mp->privkey = malloc(buf_len+1);
-            if(!mp->privkey){
-                OPENSSL_DEBUG("Malloc failed\n");
-                myopenssl_k_free(mp);
-                goto clean;
-            }
-            memset(mp->privkey, 0, buf_len+1);
-            mp->privlen = buf_len;
-
-            strcpy(mp->privkey, buf);
-            OPENSSL_DEBUG("Final output (length = %ld) =\n%s\n", mp->privlen, mp->privkey);
+    }else{
+        if((pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL)) == NULL){
+            OPENSSL_DEBUG("PEM_read_bio_PrivateKey faild\n");
+            goto clean;
         }
     }
-    ret = mp;
+    fclose(fp);
+
+    ret = pkey;
+    OPENSSL_DEBUG("---key decode done---\n");
 
     clean:
-    OSSL_LIB_CTX_free(libctx);
+    return ret;
+}
+
+size_t myopenssl_encrypt_f(const char *pubkey, const unsigned char *in, const size_t in_len, unsigned char *out){
+    OPENSSL_DEBUG("---Encrypt---\n");
+    size_t ret = 0;
+    EVP_PKEY *pkey = NULL;
+    EVP_PKEY_CTX *ctx = NULL;
+    size_t out_len;
+
+    //check input
+    if(!pubkey || !in || (in_len <= 1)){
+        OPENSSL_DEBUG("Input error\n");
+        return ret;
+    }
+
+    //decode key to EVP_PKEY
+    pkey = key_decode_f(pubkey, 1);
+    if(pkey == NULL){
+        OPENSSL_DEBUG("Pub EVP_PKEY is NULL\n");
+        goto clean;
+    }else OPENSSL_DEBUG("Get pub EVP_PKEY\n");
+
+    //create EVP_PKEY_CTX
+    if((ctx = EVP_PKEY_CTX_new(pkey, NULL)) == NULL){
+        OPENSSL_DEBUG("Fail to create ctx\n");
+        goto clean;
+    }
+    if(EVP_PKEY_encrypt_init(ctx) <= 0){
+        OPENSSL_DEBUG("Encrypt init failed\n");
+        goto clean;
+    }
+
+    //encrypt
+    if(EVP_PKEY_encrypt(ctx, out, &out_len, in, in_len) <= 0){
+        OPENSSL_DEBUG("Encrypt data failed\n");
+        goto clean;
+    }
+    OPENSSL_DEBUG("Encrypted data buffer (length = %ld) :\n%s\n", out_len, out);
+
+    ret = out_len;
+    OPENSSL_DEBUG("---Encrypt done---\n");
+
+    clean:
+    if(pkey) EVP_PKEY_free(pkey);
+    if(ctx) EVP_PKEY_CTX_free(ctx);
+    return ret;
+}
+
+size_t myopenssl_decrypt_f(const char *privkey, const unsigned char *in, const size_t in_len, unsigned char *out){
+    OPENSSL_DEBUG("---Decrypt---\n");
+    size_t ret = 0;
+    EVP_PKEY *pkey = NULL;
+    EVP_PKEY_CTX *ctx = NULL;
+    size_t out_len;
+
+    //check input
+    if(!privkey || !in || (in_len <= 1)){
+        OPENSSL_DEBUG("Input error\n");
+        return ret;
+    }
+
+    //decode key to EVP_PKEY
+    pkey = key_decode_f(privkey, 0);
+    if(pkey == NULL){
+        OPENSSL_DEBUG("Priv EVP_PKEY is NULL\n");
+        goto clean;
+    }else OPENSSL_DEBUG("Get Priv EVP_PKEY\n");
+
+    //create EVP_PKEY_CTX
+    if((ctx = EVP_PKEY_CTX_new(pkey, NULL)) == NULL){
+        OPENSSL_DEBUG("Fail to create ctx\n");
+        goto clean;
+    }
+    if(EVP_PKEY_decrypt_init(ctx) <= 0){
+        OPENSSL_DEBUG("Decrypt init failed\n");
+        goto clean;
+    }
+
+    //decrypt
+    int decrypt_ret = EVP_PKEY_decrypt(ctx, out, &out_len, in, in_len);
+    if(decrypt_ret <= 0){
+        OPENSSL_DEBUG("Decrypt data step2 failed (%d)\n", decrypt_ret);
+        goto clean;
+    }
+    OPENSSL_DEBUG("Decrypt data buffer (length = %ld) :\n%s\n", out_len, out);
+
+    ret = out_len;
+    OPENSSL_DEBUG("---Decrypt done---\n");
+
+    clean:
     EVP_PKEY_free(pkey);
-    OSSL_LIB_CTX_free(libctx);
-    OPENSSL_DEBUG("---Make PKCS#8 key finish---\n");
+    EVP_PKEY_CTX_free(ctx);
     return ret;
 }
