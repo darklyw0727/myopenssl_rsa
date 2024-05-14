@@ -11,8 +11,6 @@
 #include <stdlib.h>
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
-#include <openssl/encoder.h>
-#include <openssl/decoder.h>
 #include <openssl/pem.h>
 #include <openssl/bio.h>
 #include "myopenssl.h"
