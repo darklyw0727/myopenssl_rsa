@@ -30,9 +30,9 @@ static size_t key_encode(EVP_PKEY *pkey, char **out, const int public){
     OPENSSL_DEBUG("---Key encode---\n");
     size_t  ret = 0;
     BIO *bio = NULL;
-    char *bio_data;
+    char *bio_data = NULL;
     long data_len;
-    char *buf;
+    char *buf = NULL;
 
     if((bio = BIO_new(BIO_s_mem())) == NULL){
         OPENSSL_DEBUG("Fail to create bio\n");
@@ -58,7 +58,7 @@ static size_t key_encode(EVP_PKEY *pkey, char **out, const int public){
         goto clean;
     }
 
-    if((buf = malloc((size_t)data_len + 1)) == NULL){
+    if((buf = (char *)malloc((size_t)data_len + 1)) == NULL){
         OPENSSL_DEBUG("out malloc failed\n");
         goto clean;
     }
@@ -71,7 +71,7 @@ static size_t key_encode(EVP_PKEY *pkey, char **out, const int public){
     OPENSSL_DEBUG("---Key encode done---\n");
 
     clean:
-    if(bio) BIO_free(bio);
+    if(bio) BIO_free_all(bio);
     return ret;
 }
 
@@ -102,7 +102,7 @@ myopenssl_k *myopenssl_genkey(){
     }
 
     //Create myopenssl_k struct
-    myopenssl_k *mp = malloc(sizeof(struct myopenssl_key));
+    myopenssl_k *mp = malloc(sizeof(myopenssl_k));
     if(!mp){
         OPENSSL_DEBUG("Malloc failed\n");
         goto clean;
@@ -126,8 +126,8 @@ myopenssl_k *myopenssl_genkey(){
     ret = mp;
 
     clean:
-    if(ctx) EVP_PKEY_CTX_free(ctx);
     if(pkey) EVP_PKEY_free(pkey);
+    if(ctx) EVP_PKEY_CTX_free(ctx);
     OPENSSL_DEBUG("---myopenssl_genkey() finish---\n");
     return ret;
 }
@@ -159,7 +159,7 @@ static EVP_PKEY *key_decode(const char *in, const int public){
     OPENSSL_DEBUG("---key decode done---\n");
 
     clean:
-    if(bio) BIO_free(bio);
+    if(bio) BIO_free_all(bio);
     return ret;
 }
 
@@ -313,8 +313,8 @@ int myopenssl_genkey_f(const char *pubkey_file, const char *privkey_file){
     ret = 0;
 
     clean:
-    if(ctx) EVP_PKEY_CTX_free(ctx);
     if(pkey) EVP_PKEY_free(pkey);
+    if(ctx) EVP_PKEY_CTX_free(ctx);
     OPENSSL_DEBUG("---myopenssl_genkey_f() finish---\n");
     return ret;
 }
