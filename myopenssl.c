@@ -100,7 +100,7 @@ myopenssl_k *myopenssl_genkey(){
     }
 
     //Create myopenssl_k struct
-    myopenssl_k *mp = malloc(sizeof(myopenssl_k));
+    myopenssl_k *mp = (myopenssl_k *)malloc(sizeof(myopenssl_k));
     if(!mp){
         OPENSSL_DEBUG("Malloc failed\n");
         goto clean;
