@@ -11,10 +11,10 @@ endif
 all: $(TARGET)
 
 demo: demo.o $(OBJECT)
-	$(CC) -g -o $@ $^ $(INCLUDE) $(LIBS)
+	$(CC) -g -Wall -Werror -o $@ $^ $(INCLUDE) $(LIBS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@ $(INCLUDE)
+	$(CC) $(CFLAGS) -Wall -Werror -c $< -o $@ $(INCLUDE)
 
 .PHONY : clean all
 
