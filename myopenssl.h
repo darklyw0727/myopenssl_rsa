@@ -24,25 +24,27 @@ void myopenssl_free(unsigned char *in);
 
 /**
  * Create RSA public & private key in PEM format string
- * @returns NULL (error) or myopenssl_k that include PKCS#1 pubkey ,privkey string and their length
+ * @returns NULL (error) or myopenssl_k that include pubkey and privkey string
 */
 myopenssl_k *myopenssl_genkey();
 /**
- * Encrypt input, make sure your output buffer is enough and clean
+ * Encrypt input, return the result
  * @param pubkey <in> pubkey string
+ * @param key_len <in> pubkey length
  * @param in <in> input string
  * @param in_len <in> input length
- * @param out <out> output data, make sure it is enough and clean
- * @returns 0 (error) or output length
+ * @param out_len <out> output data length, this is a int pointer
+ * @returns NULL (error) or encrypt result
 */
 unsigned char *myopenssl_encrypt(char *pubkey, const size_t key_len, unsigned char *in, const size_t in_len, size_t *out_len);
 /**
- * Decrypt input, make sure your output buffer is enough and clean. Please decode input, if it is base64/base64url encoded
- * @param privkey <in> privkey string
+ * Decrypt input, return the result
+ * @param pubkey <in> privkey string
+ * @param key_len <in> privkey length
  * @param in <in> input string
  * @param in_len <in> input length
- * @param out <out> output data, make sure it is enough and clean
- * @returns 0 (error) or output length
+ * @param out_len <out> output data length, this is a int pointer
+ * @returns NULL (error) or decrypt result
 */
 unsigned char *myopenssl_decrypt(char *pubkey, const size_t key_len, unsigned char *in, const size_t in_len, size_t *out_len);
 
@@ -50,25 +52,25 @@ unsigned char *myopenssl_decrypt(char *pubkey, const size_t key_len, unsigned ch
  * Create RSA public & private key in PEM format file
  * @param pubkey_file <in> where to save public key
  * @param privkey_file <in> where to save private key
- * @returns 0 (successes) or -1
+ * @returns -1 (error) or 0
 */
 int myopenssl_genkey_f(const char *pubkey_file, const char *privkey_file);
 /**
- * Encrypt input, make sure your output buffer is enough and clean
- * @param keyfile <in> where is the public key
- * @param in <in> input string
- * @param in_len <in> input length
- * @param out <out> output data, make sure it is enough and clean
- * @returns 0 (error) or output length
-*/
-unsigned char *myopenssl_encrypt_f(const char *keyfile, unsigned char *in, const size_t in_len, size_t *out_len);
-/**
- * Decrypt input, make sure your output buffer is enough and clean. Please decode input, if it is base64/base64url encoded
+ * Encrypt input, return the result
  * @param keyfile <in> where is the private key
  * @param in <in> input string
  * @param in_len <in> input length
- * @param out <out> output data, make sure it is enough and clean
- * @returns 0 (error) or output length
+ * @param out_len <out> output data length, this is a int pointer
+ * @returns NULL (error) or encrypt result
+*/
+unsigned char *myopenssl_encrypt_f(const char *keyfile, unsigned char *in, const size_t in_len, size_t *out_len);
+/**
+ * Decrypt input, return the result
+ * @param keyfile <in> where is the private key
+ * @param in <in> input string
+ * @param in_len <in> input length
+ * @param out_len <out> output data length, this is a int pointer
+ * @returns NULL (error) or decrypt result
 */
 unsigned char *myopenssl_decrypt_f(const char *keyfile, unsigned char *in, const size_t in_len, size_t *out_len);
 #endif
