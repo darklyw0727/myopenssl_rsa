@@ -16,12 +16,11 @@
 
 typedef struct myopenssl_key {
     char *pubkey;
-    size_t publen;
     char *privkey;
-    size_t privlen;
 } myopenssl_k;
 
-void myopenssl_k_free(myopenssl_k *ptr);
+void myopenssl_free_k(myopenssl_k *ptr);
+void myopenssl_free(unsigned char *in);
 
 /**
  * Create RSA public & private key in PEM format string
@@ -36,7 +35,7 @@ myopenssl_k *myopenssl_genkey();
  * @param out <out> output data, make sure it is enough and clean
  * @returns 0 (error) or output length
 */
-size_t myopenssl_encrypt(const char *pubkey, const unsigned char *in, const size_t in_len, unsigned char *out);
+unsigned char *myopenssl_encrypt(char *pubkey, const size_t key_len, unsigned char *in, const size_t in_len, size_t *out_len);
 /**
  * Decrypt input, make sure your output buffer is enough and clean. Please decode input, if it is base64/base64url encoded
  * @param privkey <in> privkey string
@@ -45,7 +44,7 @@ size_t myopenssl_encrypt(const char *pubkey, const unsigned char *in, const size
  * @param out <out> output data, make sure it is enough and clean
  * @returns 0 (error) or output length
 */
-size_t myopenssl_decrypt(const char *privkey, const unsigned char *in, const size_t in_len, unsigned char *out);
+unsigned char *myopenssl_decrypt(char *pubkey, const size_t key_len, unsigned char *in, const size_t in_len, size_t *out_len);
 
 /**
  * Create RSA public & private key in PEM format file
@@ -62,7 +61,7 @@ int myopenssl_genkey_f(const char *pubkey_file, const char *privkey_file);
  * @param out <out> output data, make sure it is enough and clean
  * @returns 0 (error) or output length
 */
-size_t myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char *out);
+unsigned char *myopenssl_encrypt_f(const char *keyfile, unsigned char *in, const size_t in_len, size_t *out_len);
 /**
  * Decrypt input, make sure your output buffer is enough and clean. Please decode input, if it is base64/base64url encoded
  * @param keyfile <in> where is the private key
@@ -71,5 +70,5 @@ size_t myopenssl_encrypt_f(const char *keyfile, const unsigned char *in, const s
  * @param out <out> output data, make sure it is enough and clean
  * @returns 0 (error) or output length
 */
-size_t myopenssl_decrypt_f(const char *keyfile, const unsigned char *in, const size_t in_len, unsigned char *out);
+unsigned char *myopenssl_decrypt_f(const char *keyfile, unsigned char *in, const size_t in_len, size_t *out_len);
 #endif

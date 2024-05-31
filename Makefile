@@ -2,7 +2,6 @@ CC = gcc
 TARGET = demo
 SOURCE = myopenssl.c
 OBJECT = $(SOURCE:.c=.o)
-INCLUDE = -I/usr/include/openssl
 LIBS = -lssl -lcrypto
 
 ifdef OPENSSL_DEBUG
