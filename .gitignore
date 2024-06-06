@@ -1,4 +1,7 @@
 *.o
+*.key
+*.a
+*.so
+
 demo
 str_demo
-*.key

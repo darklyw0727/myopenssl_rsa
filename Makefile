@@ -1,22 +1,46 @@
-CC = gcc
-TARGET = demo
-SOURCE = myopenssl.c
-OBJECT = $(SOURCE:.c=.o)
-LIBS = -lssl -lcrypto
+ifeq ("$(ROOT_PATH)","")
+ROOT_PATH=$(shell pwd | sed 's/\/common.*//')
+endif
+
+include $(ROOT_PATH)/build/build-include.mk
+
+SHARE_LIB = libserarsa.so
+STATIC_LIB = libserarsa.a
+
+LD_FLAGS = $(OPENSSL_LIB)
+
+CFLAGS += -Os -Wall -Werror -fPIC
 
 ifdef OPENSSL_DEBUG
 CFLAGS += -D_OPENSSL_DEBUG
 endif
 
-all: $(TARGET)
+ARFLAGS = -c -r
 
-demo: demo.o $(OBJECT)
-	$(CC) -g -Wall -Werror -o $@ $^ $(INCLUDE) $(LIBS)
+.PHONY: clean install
+
+all: $(SHARE_LIB) $(STATIC_LIB)
+
+$(PROJECT): $(PRJOBJS)
+	@echo " LD     $@"
+	@$(CC) $(PRJLDFLAGS) -o $@ $(PRJOBJS)
+	@echo " STRIP  $@"
+	@$(STRIP) $@
+
+$(SHARE_LIB): $(OBJS)
+	@echo " LD	$@ $^"
+	@$(CC) -Werror -shared -Wl,--whole-archive,-soname,$@ -o $@ $^ -Wl,--no-whole-archive $(LD_FLAGS)
+
+$(STATIC_LIB): $(OBJS)
+	@echo " AR	$@ $^"
+	@$(AR) $(ARFLAGS) $@ $^
 
 %.o: %.c
-	$(CC) $(CFLAGS) -Wall -Werror -c $< -o $@ $(INCLUDE)
+	@echo " CC	$@"
+	@$(CC) $(CFLAGS) -g -c -o $@ $^
 
-.PHONY : clean all
+clean:
+	$(RM) *.o $(SHARE_LIB) $(STATIC_LIB) $(PROJECT)
 
-clean : 
-	-rm $(TARGET) *.o *.key
+install: all
+	cp -af $(SHARE_LIB) $(LIB_FOLDER)
