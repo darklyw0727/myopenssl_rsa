@@ -10,7 +10,7 @@
 #endif
 
 /**
- * Base on openssl 3.0
+ * Base on openssl 1.1.1
  * If your key is a file, use the function with f suffix.
 */
 

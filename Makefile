@@ -4,8 +4,10 @@ endif
 
 include $(ROOT_PATH)/build/build-include.mk
 
-SHARE_LIB = libserarsa.so
-STATIC_LIB = libserarsa.a
+OBJS = myopenssl.o
+
+SHARE_LIB = libopensslrsa.so
+STATIC_LIB = libopensslrsa.a
 
 LD_FLAGS = $(OPENSSL_LIB)
 
